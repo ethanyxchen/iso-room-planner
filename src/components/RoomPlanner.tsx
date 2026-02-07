@@ -430,7 +430,7 @@ export default function RoomPlanner() {
     buildItem('bed', 7, 2, 0),
     buildItem('plant', 1, 5, 0)
   ]);
-  const [tool, setTool] = useState<Tool>('floor');
+  const [tool, setTool] = useState<Tool>('furniture');
   const [activeFurniture, setActiveFurniture] = useState<FurnitureType>('sofa');
   const [rotation, setRotation] = useState<0 | 90>(0);
   const [viewRotation, setViewRotation] = useState<ViewRotation>(0);
@@ -530,29 +530,13 @@ export default function RoomPlanner() {
   }, [uploadPreview, handleAnalyze]);
 
   const handleCellClick = useCallback((x: number, y: number) => {
-    if (tool === 'floor' || tool === 'erase') {
-      setGrid((prev) => {
-        const next = prev.map((row, rowIndex) =>
-          row.map((cell, colIndex) => {
-            if (rowIndex !== y || colIndex !== x) return cell;
-            return tool === 'floor';
-          })
-        );
-        setItems((current) => sanitizeItems(next, current));
-        return next;
-      });
-      return;
-    }
-
-    if (tool === 'furniture') {
-      const candidate = buildItem(activeFurniture, x, y, rotation);
-      if (canPlaceItem(grid, items, candidate)) {
-        setItems((prev) => [...prev, candidate]);
-        setSelectedItemId(candidate.id);
-        setStatus('Placed furniture. Drag to move.');
-      } else {
-        setStatus('Cannot place there. Try another tile.');
-      }
+    const candidate = buildItem(activeFurniture, x, y, rotation);
+    if (canPlaceItem(grid, items, candidate)) {
+      setItems((prev) => [...prev, candidate]);
+      setSelectedItemId(candidate.id);
+      setStatus('Placed furniture. Drag to move.');
+    } else {
+      setStatus('Cannot place there. Try another tile.');
     }
   }, [activeFurniture, grid, items, rotation, tool]);
 
@@ -668,20 +652,6 @@ export default function RoomPlanner() {
             </div>
           )}
           <div className="tool-row">
-            <button
-              className={`tool-button ${tool === 'floor' ? 'active' : ''}`}
-              onClick={() => setTool('floor')}
-              type="button"
-            >
-              Add Floor
-            </button>
-            <button
-              className={`tool-button ${tool === 'erase' ? 'active' : ''}`}
-              onClick={() => setTool('erase')}
-              type="button"
-            >
-              Erase
-            </button>
             <button
               className={`tool-button ${tool === 'furniture' ? 'active' : ''}`}
               onClick={() => setTool('furniture')}
