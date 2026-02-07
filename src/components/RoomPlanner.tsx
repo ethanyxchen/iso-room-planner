@@ -5,8 +5,6 @@ import { gridToScreen, screenToGrid } from '@isocity/components/game/utils';
 import { TILE_HEIGHT, TILE_WIDTH } from '@isocity/components/game/types';
 import type { FloorPlanData, Room, RoomType } from '@/types/floorplan';
 
-type Tool = 'floor' | 'erase' | 'furniture';
-
 type FurnitureType = 'sofa' | 'bed' | 'table' | 'chair' | 'plant' | 'bookshelf' | 'lamp' | 'nightstand' | 'stove' | 'television';
 
 type Orientation = 'SE' | 'SW' | 'NW' | 'NE';
@@ -47,9 +45,9 @@ type FurniturePaletteItem = {
 const FURNITURE_CATALOG: Record<FurnitureType, FurniturePaletteItem> = {
   sofa: {
     label: 'Sofa',
-    w: 1,
-    h: 1,
-    height: 18,
+    w: 5,
+    h: 2,
+    height: 24,
     top: '#e4b49f',
     side: '#c78672',
     front: '#b0705d',
@@ -57,9 +55,9 @@ const FURNITURE_CATALOG: Record<FurnitureType, FurniturePaletteItem> = {
   },
   bed: {
     label: 'Bed',
-    w: 1,
-    h: 1,
-    height: 22,
+    w: 6,
+    h: 4,
+    height: 28,
     top: '#eadfcd',
     side: '#cbbda6',
     front: '#b6a58c',
@@ -67,9 +65,9 @@ const FURNITURE_CATALOG: Record<FurnitureType, FurniturePaletteItem> = {
   },
   table: {
     label: 'Table',
-    w: 1,
-    h: 1,
-    height: 14,
+    w: 4,
+    h: 3,
+    height: 18,
     top: '#d6c08f',
     side: '#b59e6c',
     front: '#a38a5b',
@@ -77,9 +75,9 @@ const FURNITURE_CATALOG: Record<FurnitureType, FurniturePaletteItem> = {
   },
   chair: {
     label: 'Chair',
-    w: 1,
-    h: 1,
-    height: 14,
+    w: 2,
+    h: 2,
+    height: 16,
     top: '#e8a84c',
     side: '#c78432',
     front: '#b07228',
@@ -87,9 +85,9 @@ const FURNITURE_CATALOG: Record<FurnitureType, FurniturePaletteItem> = {
   },
   plant: {
     label: 'Plant',
-    w: 1,
-    h: 1,
-    height: 20,
+    w: 2,
+    h: 2,
+    height: 22,
     top: '#9ccc75',
     side: '#7faa5b',
     front: '#6f914e',
@@ -97,9 +95,9 @@ const FURNITURE_CATALOG: Record<FurnitureType, FurniturePaletteItem> = {
   },
   bookshelf: {
     label: 'Bookshelf',
-    w: 1,
+    w: 3,
     h: 1,
-    height: 28,
+    height: 30,
     top: '#e8a84c',
     side: '#c78432',
     front: '#a06828',
@@ -109,7 +107,7 @@ const FURNITURE_CATALOG: Record<FurnitureType, FurniturePaletteItem> = {
     label: 'Lamp',
     w: 1,
     h: 1,
-    height: 24,
+    height: 26,
     top: '#d4c878',
     side: '#b0a45c',
     front: '#988c4c',
@@ -117,9 +115,9 @@ const FURNITURE_CATALOG: Record<FurnitureType, FurniturePaletteItem> = {
   },
   nightstand: {
     label: 'Side Table',
-    w: 1,
+    w: 2,
     h: 1,
-    height: 14,
+    height: 16,
     top: '#e8a84c',
     side: '#c78432',
     front: '#a06828',
@@ -127,9 +125,9 @@ const FURNITURE_CATALOG: Record<FurnitureType, FurniturePaletteItem> = {
   },
   stove: {
     label: 'Stove',
-    w: 1,
-    h: 1,
-    height: 20,
+    w: 2,
+    h: 2,
+    height: 22,
     top: '#e8e0d0',
     side: '#b09080',
     front: '#e8e0d0',
@@ -137,9 +135,9 @@ const FURNITURE_CATALOG: Record<FurnitureType, FurniturePaletteItem> = {
   },
   television: {
     label: 'Television',
-    w: 1,
+    w: 2,
     h: 1,
-    height: 22,
+    height: 20,
     top: '#c8c8c8',
     side: '#888888',
     front: '#a8a8a8',
@@ -161,11 +159,12 @@ const KENNEY_TILE_PX = 208;
 
 type SpriteBaseInfo = {
   baseName: string;
+  scale?: number;
 };
 
 const SPRITE_BASE_MAP: Partial<Record<FurnitureType, SpriteBaseInfo>> = {
   sofa: { baseName: 'loungeSofa' },
-  bed: { baseName: 'bedDouble' },
+  bed: { baseName: 'bedDouble', scale: 0.75 },
   table: { baseName: 'table' },
   chair: { baseName: 'chair' },
   plant: { baseName: 'pottedPlant' },
@@ -216,6 +215,8 @@ const DEFAULT_WIDTH = 12;
 const DEFAULT_HEIGHT = 8;
 const MAX_COLS = 96;
 const MAX_ROWS = 72;
+const GRANULARITY_TARGET = 4;
+const WALL_HEIGHT_TILES = 5.5;
 
 function createFloor(width: number, height: number): boolean[][] {
   return Array.from({ length: height }, () => Array.from({ length: width }, () => true));
@@ -581,7 +582,6 @@ export default function RoomPlanner() {
     buildItem('bed', 7, 2, 0),
     buildItem('plant', 1, 5, 0)
   ]);
-  const [tool, setTool] = useState<Tool>('furniture');
   const [activeFurniture, setActiveFurniture] = useState<FurnitureType>('sofa');
   const [rotation, setRotation] = useState<Rotation>(0);
   const [viewRotation, setViewRotation] = useState<ViewRotation>(0);
@@ -590,7 +590,6 @@ export default function RoomPlanner() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [baseGrid, setBaseGrid] = useState<boolean[][] | null>(() => createFloor(DEFAULT_WIDTH, DEFAULT_HEIGHT));
   const [baseRooms, setBaseRooms] = useState<Room[]>([]);
-  const [granularity, setGranularity] = useState(1);
 
   // Upload state
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
@@ -604,23 +603,12 @@ export default function RoomPlanner() {
   const gridWidth = grid[0]?.length ?? 0;
   const gridHeight = grid.length;
 
-  const occupancy = useMemo(() => {
-    const map = new Map<string, FurnitureType>();
-    for (const item of items) {
-      for (const cell of itemCells(item)) {
-        map.set(`${cell.x},${cell.y}`, item.type);
-      }
-    }
-    return map;
-  }, [items]);
-
   // --- Upload handlers ---
   const onFloorPlanParsed = useCallback((data: FloorPlanData, furnish = true) => {
     setGrid(data.grid);
     setRooms(data.rooms);
     setBaseGrid(data.grid);
     setBaseRooms(data.rooms);
-    setGranularity(1);
     setSelectedItemId(null);
 
     if (furnish && data.rooms.length > 0) {
@@ -705,7 +693,7 @@ export default function RoomPlanner() {
     setStatus(`Loaded "${preset.name}" with auto-furnished rooms.`);
   }, [onFloorPlanParsed]);
 
-  const handleCellClick = useCallback((x: number, y: number) => {
+  const handlePlaceAt = useCallback((x: number, y: number) => {
     const candidate = buildItem(activeFurniture, x, y, rotation);
     if (canPlaceItem(grid, items, candidate)) {
       setItems((prev) => [...prev, candidate]);
@@ -714,14 +702,13 @@ export default function RoomPlanner() {
     } else {
       setStatus('Cannot place there. Try another tile.');
     }
-  }, [activeFurniture, grid, items, rotation, tool]);
+  }, [activeFurniture, grid, items, rotation]);
 
   const resetScene = useCallback(() => {
     const nextGrid = createFloor(DEFAULT_WIDTH, DEFAULT_HEIGHT);
     setGrid(nextGrid);
     setBaseGrid(nextGrid);
     setBaseRooms([]);
-    setGranularity(1);
     setItems([
       buildItem('sofa', 2, 2, 0),
       buildItem('table', 5, 3, 0),
@@ -744,6 +731,7 @@ export default function RoomPlanner() {
     return Math.max(1, Math.min(Math.floor(MAX_COLS / baseCols), Math.floor(MAX_ROWS / baseRows)));
   }, [baseGrid]);
 
+  const granularity = useMemo(() => Math.min(GRANULARITY_TARGET, maxGranularity), [maxGranularity]);
   const prevGranRef = useRef(granularity);
   useEffect(() => {
     if (!baseGrid || baseGrid.length === 0 || baseGrid[0]?.length === 0) return;
@@ -842,16 +830,6 @@ export default function RoomPlanner() {
             ))}
           </div>
 
-          <div className="tool-row">
-            <button
-              className={`tool-button ${tool === 'furniture' ? 'active' : ''}`}
-              onClick={() => setTool('furniture')}
-              type="button"
-            >
-              Place Furniture
-            </button>
-          </div>
-
           <div className="furniture-list">
             {Object.entries(FURNITURE_CATALOG).map(([key, data]) => (
               <button
@@ -860,7 +838,6 @@ export default function RoomPlanner() {
                 className={`furniture-card ${activeFurniture === key ? 'active' : ''}`}
                 onClick={() => {
                   setActiveFurniture(key as FurnitureType);
-                  setTool('furniture');
                 }}
               >
                 <SpritePreview type={key as FurnitureType} images={spriteImages} rotation={activeFurniture === key ? rotation : 0} />
@@ -880,67 +857,12 @@ export default function RoomPlanner() {
             </button>
           </div>
 
-          <div className="granularity-row">
-            <label>Granularity</label>
-            <div className="granularity-controls">
-              <input
-                type="range"
-                min={1}
-                max={maxGranularity}
-                value={granularity}
-                onChange={(e) => setGranularity(Number(e.target.value))}
-                disabled={maxGranularity <= 1}
-              />
-              <span className="granularity-value">{granularity}x</span>
-            </div>
-            <span className="granularity-note">
-              {gridWidth}x{gridHeight} tiles &mdash; slide to change detail
-            </span>
-          </div>
-
-          <div
-            className="grid"
-            style={{ gridTemplateColumns: `repeat(${gridWidth}, ${Math.max(12, Math.floor(336 / gridWidth))}px)` }}
-          >
-            {grid.map((row, y) =>
-              row.map((cell, x) => {
-                const key = `${x},${y}`;
-                const itemType = occupancy.get(key);
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    className={`grid-cell ${cell ? 'floor' : 'blocked'}`}
-                    onClick={() => handleCellClick(x, y)}
-                    title={cell ? 'Floor' : 'Empty'}
-                    style={{
-                      width: Math.max(12, Math.floor(336 / gridWidth)),
-                      height: Math.max(12, Math.floor(336 / gridWidth)),
-                      fontSize: gridWidth > 24 ? '0.4rem' : '0.65rem',
-                      ...(itemType
-                        ? { background: FURNITURE_CATALOG[itemType].swatch, color: '#0b0f14' }
-                        : {}),
-                    }}
-                  >
-                    {itemType ? itemType[0].toUpperCase() : ''}
-                  </button>
-                );
-              })
-            )}
-          </div>
-
-          <div className="legend">
-            <span><i style={{ background: 'rgba(108, 212, 197, 0.6)' }} /> Floor</span>
-            <span><i style={{ background: 'rgba(224, 122, 95, 0.5)' }} /> Empty</span>
-            <span><i style={{ background: 'var(--accent)' }} /> Furniture</span>
-          </div>
-
           <div className="actions">
             <button className="action-button primary" onClick={resetScene} type="button">Reset Scene</button>
             <button className="action-button" onClick={handleAutoFurnish} type="button">Auto-Furnish</button>
             <button className="action-button" onClick={clearFurniture} type="button">Clear Furniture</button>
           </div>
-          <p className="note">Tip: click any tile while in Place Furniture mode to drop items. Drag items around in the isometric view.</p>
+          <p className="note">Tip: click in the isometric view to place furniture. Drag items to move them.</p>
         </div>
 
         <div className="panel">
@@ -972,10 +894,11 @@ export default function RoomPlanner() {
                 )
               );
             }}
+            onPlaceItem={handlePlaceAt}
             selectedItemId={selectedItemId}
             onSelectItem={setSelectedItemId}
           />
-          <div className="status">{status} Drag empty space to pan, scroll to zoom.</div>
+          <div className="status">{status} Shift-drag or right-click to pan, scroll to zoom.</div>
         </div>
       </section>
     </>
@@ -990,6 +913,7 @@ type IsoRoomCanvasProps = {
   spriteImages: Record<string, HTMLImageElement>;
   viewRotation: ViewRotation;
   onMoveItem: (id: string, x: number, y: number) => void;
+  onPlaceItem: (x: number, y: number) => void;
   selectedItemId: string | null;
   onSelectItem: (id: string | null) => void;
 };
@@ -1002,6 +926,7 @@ function IsoRoomCanvas({
   spriteImages,
   viewRotation,
   onMoveItem,
+  onPlaceItem,
   selectedItemId,
   onSelectItem
 }: IsoRoomCanvasProps) {
@@ -1049,7 +974,7 @@ function IsoRoomCanvas({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
 
-    const wallHeight = 42;
+    const wallHeight = Math.round(TILE_HEIGHT * WALL_HEIGHT_TILES);
     const baseScale =
       viewRotation === 90 || viewRotation === 270
         ? (baseRows > 0 && gridHeight > 0 ? baseRows / gridHeight : 1)
@@ -1200,14 +1125,20 @@ function IsoRoomCanvas({
     };
 
     const drawSprite = (item: FurnitureItem, img: HTMLImageElement) => {
-      // Scale from kenney pixel space to our tile grid
-      const scale = TILE_WIDTH / KENNEY_TILE_PX;
+      const topCorner = gridToScreen(item.x, item.y, offsetX, offsetY);
+      const rightCorner = gridToScreen(item.x + item.w, item.y, offsetX, offsetY);
+      const bottomCorner = gridToScreen(item.x + item.w, item.y + item.h, offsetX, offsetY);
+      const leftCorner = gridToScreen(item.x, item.y + item.h, offsetX, offsetY);
+
+      const minX = Math.min(topCorner.screenX, rightCorner.screenX, bottomCorner.screenX, leftCorner.screenX);
+      const maxX = Math.max(topCorner.screenX, rightCorner.screenX, bottomCorner.screenX, leftCorner.screenX) + TILE_WIDTH;
+      const footprintWidth = Math.max(1, maxX - minX);
+
+      // Scale from Kenney pixel space to our footprint size
+      const spriteScale = SPRITE_BASE_MAP[item.type]?.scale ?? 1;
+      const scale = (footprintWidth / KENNEY_TILE_PX) * spriteScale;
       const dw = img.naturalWidth * scale;
       const dh = img.naturalHeight * scale;
-
-      // The footprint diamond center in screen coords
-      const topCorner = gridToScreen(item.x, item.y, offsetX, offsetY);
-      const bottomCorner = gridToScreen(item.x + item.w, item.y + item.h, offsetX, offsetY);
 
       // Center of the footprint diamond
       const centerX = (topCorner.screenX + bottomCorner.screenX) / 2 + TILE_WIDTH / 2;
@@ -1349,13 +1280,17 @@ function IsoRoomCanvas({
       return;
     }
 
+    if (event.button === 0 && !event.shiftKey) {
+      onPlaceItem(original.x, original.y);
+      return;
+    }
+
     onSelectItem(null);
-    // If clicking empty space, start panning with left-click too.
-    if (event.button === 0 || event.button === 1 || event.button === 2 || event.shiftKey) {
+    if (event.button === 1 || event.button === 2 || event.shiftKey) {
       setIsPanning(true);
       panStartRef.current = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y };
     }
-  }, [baseCols, baseRows, gridHeight, gridWidth, items, onSelectItem, pan.x, pan.y, viewRotation, zoom]);
+  }, [baseCols, baseRows, gridHeight, gridWidth, items, onPlaceItem, onSelectItem, pan.x, pan.y, viewRotation, zoom]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
     if (isPanning && panStartRef.current) {
@@ -1430,7 +1365,7 @@ function IsoRoomCanvas({
 
   useEffect(() => {
     if (gridWidth === 0 || gridHeight === 0) return;
-    const wallHeight = 42;
+    const wallHeight = Math.round(TILE_HEIGHT * WALL_HEIGHT_TILES);
     const corners = [
       gridToScreen(0, 0, 0, 0),
       gridToScreen(viewWidth - 1, 0, 0, 0),
