@@ -9,6 +9,18 @@ type Tool = 'floor' | 'erase' | 'furniture';
 
 type FurnitureType = 'sofa' | 'bed' | 'table' | 'chair' | 'plant' | 'bookshelf' | 'lamp' | 'nightstand' | 'stove' | 'television';
 
+type Orientation = 'SE' | 'SW' | 'NW' | 'NE';
+type Rotation = 0 | 90 | 180 | 270;
+
+const ROTATION_TO_ORIENTATION: Record<Rotation, Orientation> = {
+  0: 'SE',
+  90: 'SW',
+  180: 'NW',
+  270: 'NE',
+};
+
+const ORIENTATIONS: Orientation[] = ['SE', 'SW', 'NW', 'NE'];
+
 type FurnitureItem = {
   id: string;
   type: FurnitureType;
@@ -16,7 +28,7 @@ type FurnitureItem = {
   y: number;
   w: number;
   h: number;
-  rotation: 0 | 90;
+  rotation: Rotation;
 };
 
 type ViewRotation = 0 | 90 | 180 | 270;
@@ -147,50 +159,55 @@ const ROOM_COLORS: Record<RoomType, { fill: string; label: string }> = {
 // Kenney sprite base tile is 208px wide; our TILE_WIDTH is 64
 const KENNEY_TILE_PX = 208;
 
-type SpriteInfo = {
-  src: string;
-  /** native pixel width */
-  pw: number;
-  /** native pixel height */
-  ph: number;
+type SpriteBaseInfo = {
+  baseName: string;
 };
 
-const SPRITE_MAP: Partial<Record<FurnitureType, SpriteInfo>> = {
-  sofa:       { src: '/sprites/kenney/loungeSofa_SE.png',       pw: 141, ph: 141 },
-  bed:        { src: '/sprites/kenney/bedDouble_SE.png',        pw: 215, ph: 190 },
-  table:      { src: '/sprites/kenney/table_SE.png',            pw: 133, ph: 129 },
-  chair:      { src: '/sprites/kenney/chair_SE.png',            pw: 42,  ph: 79  },
-  plant:      { src: '/sprites/kenney/pottedPlant_SE.png',      pw: 28,  ph: 85  },
-  bookshelf:  { src: '/sprites/kenney/bookcaseOpen_SE.png',     pw: 67,  ph: 140 },
-  lamp:       { src: '/sprites/kenney/lampRoundFloor_SE.png',   pw: 24,  ph: 105 },
-  nightstand: { src: '/sprites/kenney/sideTable_SE.png',        pw: 78,  ph: 95  },
-  stove:      { src: '/sprites/kenney/kitchenStove_SE.png',     pw: 92,  ph: 109 },
-  television: { src: '/sprites/kenney/televisionModern_SE.png', pw: 74,  ph: 93  },
+const SPRITE_BASE_MAP: Partial<Record<FurnitureType, SpriteBaseInfo>> = {
+  sofa: { baseName: 'loungeSofa' },
+  bed: { baseName: 'bedDouble' },
+  table: { baseName: 'table' },
+  chair: { baseName: 'chair' },
+  plant: { baseName: 'pottedPlant' },
+  bookshelf: { baseName: 'bookcaseOpen' },
+  lamp: { baseName: 'lampRoundFloor' },
+  nightstand: { baseName: 'sideTable' },
+  stove: { baseName: 'kitchenStove' },
+  television: { baseName: 'televisionModern' },
 };
 
-function useSpriteImages(spriteMap: Partial<Record<FurnitureType, SpriteInfo>>): Record<string, HTMLImageElement> {
+function useSpriteImages(spriteBaseMap: Partial<Record<FurnitureType, SpriteBaseInfo>>): Record<string, HTMLImageElement> {
   const [images, setImages] = useState<Record<string, HTMLImageElement>>({});
 
   useEffect(() => {
-    const entries = Object.entries(spriteMap) as [FurnitureType, SpriteInfo][];
+    const entries = Object.entries(spriteBaseMap) as [FurnitureType, SpriteBaseInfo][];
     let cancelled = false;
     const loaded: Record<string, HTMLImageElement> = {};
-    let remaining = entries.length;
+    let remaining = entries.length * ORIENTATIONS.length;
 
     for (const [type, info] of entries) {
-      const img = new Image();
-      img.onload = () => {
-        loaded[type] = img;
-        remaining -= 1;
-        if (remaining === 0 && !cancelled) {
-          setImages({ ...loaded });
-        }
-      };
-      img.src = info.src;
+      for (const orient of ORIENTATIONS) {
+        const key = `${type}_${orient}`;
+        const img = new Image();
+        img.onload = () => {
+          loaded[key] = img;
+          remaining -= 1;
+          if (remaining === 0 && !cancelled) {
+            setImages({ ...loaded });
+          }
+        };
+        img.onerror = () => {
+          remaining -= 1;
+          if (remaining === 0 && !cancelled) {
+            setImages({ ...loaded });
+          }
+        };
+        img.src = `/sprites/kenney/${info.baseName}_${orient}.png`;
+      }
     }
 
     return () => { cancelled = true; };
-  }, [spriteMap]);
+  }, [spriteBaseMap]);
 
   return images;
 }
@@ -263,10 +280,11 @@ function createId(): string {
   return `item-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function buildItem(type: FurnitureType, x: number, y: number, rotation: 0 | 90): FurnitureItem {
+function buildItem(type: FurnitureType, x: number, y: number, rotation: Rotation): FurnitureItem {
   const base = FURNITURE_CATALOG[type];
-  const w = rotation === 90 ? base.h : base.w;
-  const h = rotation === 90 ? base.w : base.h;
+  const swapped = rotation === 90 || rotation === 270;
+  const w = swapped ? base.h : base.w;
+  const h = swapped ? base.w : base.h;
   return { id: createId(), type, x, y, w, h, rotation };
 }
 
@@ -387,9 +405,10 @@ function sanitizeItems(grid: boolean[][], items: FurnitureItem[]): FurnitureItem
   });
 }
 
-function SpritePreview({ type, images }: { type: FurnitureType; images: Record<string, HTMLImageElement> }) {
+function SpritePreview({ type, images, rotation }: { type: FurnitureType; images: Record<string, HTMLImageElement>; rotation: Rotation }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const img = images[type];
+  const orient = ROTATION_TO_ORIENTATION[rotation];
+  const img = images[`${type}_${orient}`] ?? images[`${type}_SE`];
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -413,7 +432,7 @@ function SpritePreview({ type, images }: { type: FurnitureType; images: Record<s
     const dy = (ch - dh) / 2;
 
     ctx.drawImage(img, dx, dy, dw, dh);
-  }, [img]);
+  }, [img, rotation]);
 
   if (!img) {
     return <div className="furniture-swatch" style={{ background: FURNITURE_CATALOG[type].swatch }} />;
@@ -432,7 +451,7 @@ export default function RoomPlanner() {
   ]);
   const [tool, setTool] = useState<Tool>('furniture');
   const [activeFurniture, setActiveFurniture] = useState<FurnitureType>('sofa');
-  const [rotation, setRotation] = useState<0 | 90>(0);
+  const [rotation, setRotation] = useState<Rotation>(0);
   const [viewRotation, setViewRotation] = useState<ViewRotation>(0);
   const [status, setStatus] = useState<string>('Drag furniture in the isometric view to move it.');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -448,7 +467,7 @@ export default function RoomPlanner() {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const spriteImages = useSpriteImages(SPRITE_MAP);
+  const spriteImages = useSpriteImages(SPRITE_BASE_MAP);
 
   const gridWidth = grid[0]?.length ?? 0;
   const gridHeight = grid.length;
@@ -672,7 +691,7 @@ export default function RoomPlanner() {
                   setTool('furniture');
                 }}
               >
-                <SpritePreview type={key as FurnitureType} images={spriteImages} />
+                <SpritePreview type={key as FurnitureType} images={spriteImages} rotation={activeFurniture === key ? rotation : 0} />
                 <strong>{data.label}</strong>
                 <div className="note">{data.w}x{data.h} tiles</div>
               </button>
@@ -682,10 +701,10 @@ export default function RoomPlanner() {
           <div className="tool-row">
             <button
               className="tool-button"
-              onClick={() => setRotation((prev) => (prev === 0 ? 90 : 0))}
+              onClick={() => setRotation((prev) => ((prev + 90) % 360) as Rotation)}
               type="button"
             >
-              Rotate Furniture {rotation === 0 ? '0°' : '90°'}
+              Rotate {rotation}° ({ROTATION_TO_ORIENTATION[rotation]})
             </button>
           </div>
 
@@ -1008,13 +1027,10 @@ function IsoRoomCanvas({
     };
 
     const drawSprite = (item: FurnitureItem, img: HTMLImageElement) => {
-      const info = SPRITE_MAP[item.type];
-      if (!info) return;
-
       // Scale from kenney pixel space to our tile grid
       const scale = TILE_WIDTH / KENNEY_TILE_PX;
-      const dw = info.pw * scale;
-      const dh = info.ph * scale;
+      const dw = img.naturalWidth * scale;
+      const dh = img.naturalHeight * scale;
 
       // The footprint diamond center in screen coords
       const topCorner = gridToScreen(item.x, item.y, offsetX, offsetY);
@@ -1101,8 +1117,10 @@ function IsoRoomCanvas({
     // Draw furniture items sorted by depth
     const sortedItems = [...viewItems].sort((a, b) => (a.x + a.y) - (b.x + b.y));
     for (const viewItem of sortedItems) {
-      const img = spriteImages[viewItem.type];
-      if (img && SPRITE_MAP[viewItem.type]) {
+      const orient = ROTATION_TO_ORIENTATION[viewItem.rotation];
+      const spriteKey = `${viewItem.type}_${orient}`;
+      const img = spriteImages[spriteKey] ?? spriteImages[`${viewItem.type}_SE`];
+      if (img && SPRITE_BASE_MAP[viewItem.type]) {
         drawSprite(viewItem, img);
       } else {
         drawCuboid(viewItem);
