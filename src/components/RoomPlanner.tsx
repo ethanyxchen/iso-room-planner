@@ -405,6 +405,138 @@ function sanitizeItems(grid: boolean[][], items: FurnitureItem[]): FurnitureItem
   });
 }
 
+/* ------------------------------------------------------------------ */
+/* Auto-furnish: place appropriate furniture in detected rooms         */
+/* ------------------------------------------------------------------ */
+
+const ROOM_FURNITURE: Record<RoomType, FurnitureType[]> = {
+  bedroom: ['bed', 'nightstand', 'lamp'],
+  living_room: ['sofa', 'table', 'television', 'plant'],
+  kitchen: ['stove', 'table', 'chair'],
+  bathroom: [],
+  hallway: ['plant'],
+  office: ['table', 'chair', 'bookshelf', 'lamp'],
+};
+
+function autoFurnish(grid: boolean[][], rooms: Room[]): FurnitureItem[] {
+  const placed: FurnitureItem[] = [];
+
+  for (const room of rooms) {
+    const types = ROOM_FURNITURE[room.type] ?? [];
+
+    for (const ftype of types) {
+      const cat = FURNITURE_CATALOG[ftype];
+      let didPlace = false;
+
+      // Try positions inside the room, with a 1-cell margin from edges when possible
+      const margin = Math.min(1, Math.floor(Math.min(room.w, room.h) / 3));
+      for (let dy = margin; dy <= room.h - cat.h - margin && !didPlace; dy++) {
+        for (let dx = margin; dx <= room.w - cat.w - margin && !didPlace; dx++) {
+          const candidate = buildItem(ftype, room.x + dx, room.y + dy, 0);
+          if (canPlaceItem(grid, placed, candidate)) {
+            placed.push(candidate);
+            didPlace = true;
+          }
+        }
+      }
+
+      // Fallback: try without margin
+      if (!didPlace) {
+        for (let dy = 0; dy <= room.h - cat.h && !didPlace; dy++) {
+          for (let dx = 0; dx <= room.w - cat.w && !didPlace; dx++) {
+            const candidate = buildItem(ftype, room.x + dx, room.y + dy, 0);
+            if (canPlaceItem(grid, placed, candidate)) {
+              placed.push(candidate);
+              didPlace = true;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return placed;
+}
+
+/* ------------------------------------------------------------------ */
+/* Sample floor plan presets                                           */
+/* ------------------------------------------------------------------ */
+
+type SamplePreset = { name: string; data: FloorPlanData };
+
+const SAMPLE_PRESETS: SamplePreset[] = [
+  {
+    name: 'Studio Apartment',
+    data: {
+      grid: [
+        [false,false,false,false,false,false,false,false,false,false],
+        [false, true, true, true, true, true, true, true, true,false],
+        [false, true, true, true, true, true, true, true, true,false],
+        [false, true, true, true,false, true, true, true, true,false],
+        [false, true, true, true,false, true, true, true, true,false],
+        [false, true, true, true,false,false, true, true, true,false],
+        [false, true, true, true, true, true, true, true, true,false],
+        [false,false,false,false,false,false,false,false,false,false],
+      ],
+      rooms: [
+        { type: 'living_room', label: 'Living Area', x: 1, y: 1, w: 3, h: 5 },
+        { type: 'bedroom',     label: 'Sleeping Nook', x: 5, y: 1, w: 4, h: 3 },
+        { type: 'kitchen',     label: 'Kitchen', x: 6, y: 5, w: 3, h: 2 },
+        { type: 'bathroom',    label: 'Bathroom', x: 5, y: 5, w: 1, h: 1 },
+      ],
+    },
+  },
+  {
+    name: 'One-Bedroom',
+    data: {
+      grid: [
+        [false,false,false,false,false,false,false,false,false,false,false,false,false,false],
+        [false, true, true, true, true, true,false, true, true, true, true, true, true,false],
+        [false, true, true, true, true, true,false, true, true, true, true, true, true,false],
+        [false, true, true, true, true, true,false, true, true, true, true, true, true,false],
+        [false, true, true, true, true, true, true, true, true, true, true, true, true,false],
+        [false, true, true, true, true, true, true, true, true, true, true, true, true,false],
+        [false,false,false, true, true, true, true, true,false,false,false,false,false,false],
+        [false, true, true, true, true, true, true, true,false, true, true, true, true,false],
+        [false, true, true, true, true, true, true, true,false, true, true, true, true,false],
+        [false,false,false,false,false,false,false,false,false,false,false,false,false,false],
+      ],
+      rooms: [
+        { type: 'living_room', label: 'Living Room',  x: 1, y: 1, w: 5, h: 5 },
+        { type: 'bedroom',     label: 'Bedroom',      x: 7, y: 1, w: 6, h: 5 },
+        { type: 'hallway',     label: 'Hall',          x: 3, y: 6, w: 5, h: 1 },
+        { type: 'kitchen',     label: 'Kitchen',       x: 1, y: 7, w: 7, h: 2 },
+        { type: 'bathroom',    label: 'Bathroom',      x: 9, y: 7, w: 4, h: 2 },
+      ],
+    },
+  },
+  {
+    name: 'L-Shaped House',
+    data: {
+      grid: [
+        [false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false],
+        [false, true, true, true, true, true,false, true, true, true, true,false,false,false,false,false],
+        [false, true, true, true, true, true,false, true, true, true, true,false,false,false,false,false],
+        [false, true, true, true, true, true,false, true, true, true, true,false,false,false,false,false],
+        [false, true, true, true, true, true, true, true, true, true, true,false,false,false,false,false],
+        [false, true, true, true, true, true, true, true, true, true, true,false,false,false,false,false],
+        [false, true, true, true, true, true,false,false,false,false,false,false,false,false,false,false],
+        [false, true, true, true, true, true,false, true, true, true, true, true, true, true, true,false],
+        [false, true, true, true, true, true,false, true, true, true, true, true, true, true, true,false],
+        [false, true, true, true, true, true,false, true, true, true, true, true, true, true, true,false],
+        [false, true, true, true, true, true, true, true, true, true, true, true, true, true, true,false],
+        [false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false],
+      ],
+      rooms: [
+        { type: 'living_room', label: 'Living Room',   x: 1, y: 1, w: 5, h: 5 },
+        { type: 'bedroom',     label: 'Bedroom',       x: 7, y: 1, w: 4, h: 5 },
+        { type: 'kitchen',     label: 'Kitchen',       x: 1, y: 6, w: 5, h: 5 },
+        { type: 'office',      label: 'Office',        x: 7, y: 7, w: 8, h: 4 },
+      ],
+    },
+  },
+];
+
 function SpritePreview({ type, images, rotation }: { type: FurnitureType; images: Record<string, HTMLImageElement>; rotation: Rotation }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const orient = ROTATION_TO_ORIENTATION[rotation];
@@ -483,15 +615,22 @@ export default function RoomPlanner() {
   }, [items]);
 
   // --- Upload handlers ---
-  const onFloorPlanParsed = useCallback((data: FloorPlanData) => {
+  const onFloorPlanParsed = useCallback((data: FloorPlanData, furnish = true) => {
     setGrid(data.grid);
     setRooms(data.rooms);
     setBaseGrid(data.grid);
     setBaseRooms(data.rooms);
     setGranularity(1);
-    setItems([]);
     setSelectedItemId(null);
-    setStatus('Floor plan loaded! Drop furniture or use auto-furnish.');
+
+    if (furnish && data.rooms.length > 0) {
+      const furnished = autoFurnish(data.grid, data.rooms);
+      setItems(furnished);
+      setStatus(`Floor plan loaded with ${data.rooms.length} rooms and ${furnished.length} furniture items!`);
+    } else {
+      setItems([]);
+      setStatus('Floor plan loaded! Use Auto-Furnish or drop furniture manually.');
+    }
   }, []);
 
   const readFileAsDataUrl = (file: File): Promise<string> =>
@@ -547,6 +686,24 @@ export default function RoomPlanner() {
       handleAnalyze();
     }
   }, [uploadPreview, handleAnalyze]);
+
+  const handleAutoFurnish = useCallback(() => {
+    if (rooms.length === 0) {
+      setStatus('No rooms detected. Upload a floor plan or load a sample first.');
+      return;
+    }
+    const furnished = autoFurnish(grid, rooms);
+    setItems(furnished);
+    setSelectedItemId(null);
+    setStatus(`Auto-furnished ${furnished.length} items across ${rooms.length} rooms.`);
+  }, [grid, rooms]);
+
+  const handleLoadPreset = useCallback((preset: SamplePreset) => {
+    onFloorPlanParsed(preset.data, true);
+    setUploadPreview(null);
+    setUploadError(null);
+    setStatus(`Loaded "${preset.name}" with auto-furnished rooms.`);
+  }, [onFloorPlanParsed]);
 
   const handleCellClick = useCallback((x: number, y: number) => {
     const candidate = buildItem(activeFurniture, x, y, rotation);
@@ -670,6 +827,21 @@ export default function RoomPlanner() {
               <button type="button" className="tool-button" onClick={handleTryAgain}>Try Again</button>
             </div>
           )}
+
+          <div className="preset-row">
+            <span className="preset-label">Quick start:</span>
+            {SAMPLE_PRESETS.map((preset) => (
+              <button
+                key={preset.name}
+                type="button"
+                className="tool-button"
+                onClick={() => handleLoadPreset(preset)}
+              >
+                {preset.name}
+              </button>
+            ))}
+          </div>
+
           <div className="tool-row">
             <button
               className={`tool-button ${tool === 'furniture' ? 'active' : ''}`}
@@ -765,6 +937,7 @@ export default function RoomPlanner() {
 
           <div className="actions">
             <button className="action-button primary" onClick={resetScene} type="button">Reset Scene</button>
+            <button className="action-button" onClick={handleAutoFurnish} type="button">Auto-Furnish</button>
             <button className="action-button" onClick={clearFurniture} type="button">Clear Furniture</button>
           </div>
           <p className="note">Tip: click any tile while in Place Furniture mode to drop items. Drag items around in the isometric view.</p>

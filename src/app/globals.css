@@ -349,6 +349,20 @@ a {
   gap: 10px;
 }
 
+.preset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.preset-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .spinner {
   display: inline-block;
   width: 14px;

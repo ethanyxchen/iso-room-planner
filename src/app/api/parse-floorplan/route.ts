@@ -15,20 +15,41 @@ const DEFAULT_COLS = 16;
 const DEFAULT_ROWS = 12;
 
 function buildPrompt(cols: number, rows: number): string {
-  return `You are analyzing a floor plan image. Return ONLY valid JSON with no other text, no markdown, no code fences.
+  return `You are analyzing a 2D floor plan image. Convert it into a ${cols}×${rows} boolean grid and a list of detected rooms.
 
-Schema:
-{
-  "grid": boolean[][],
-  "rooms": { "type": string, "label": string, "x": number, "y": number, "w": number, "h": number }[]
-}
+STEP-BY-STEP INSTRUCTIONS:
 
-Rules:
-1. grid must be exactly ${cols} columns and ${rows} rows. grid[y][x]: true = floor/walkable, false = wall or outside.
-2. Map the floor plan proportionally onto this grid. Interior floor space = true, walls, voids, and exterior = false.
-3. Do NOT assume the floor is a full rectangle. Preserve irregular shapes, cutouts, and courtyards visible in the plan.
-3. rooms: detect each distinct room. type must be one of: bedroom, living_room, kitchen, bathroom, hallway, office. label is a short name like "Master Bedroom" or "Kitchen". x,y = top-left cell of the room in grid coords (0-indexed). w,h = width and height in cells. Every room must fit inside the grid and only cover cells where grid[y][x] is true.
-4. Return only the JSON object, no explanation.`;
+1. ANALYZE THE IMAGE
+   • Identify the outer walls / boundary of the building or apartment.
+   • Identify interior walls that divide the space into rooms.
+   • Recognize each room from labels, furniture icons, or architectural conventions:
+     - Bed → bedroom, toilet/shower → bathroom, stove/counter → kitchen,
+       sofa/TV area → living_room, desk → office, narrow passage → hallway.
+
+2. BUILD THE GRID (exactly ${rows} rows × ${cols} columns)
+   • grid is a 2-D boolean array: grid[row][col].
+   • true = walkable interior floor space.
+   • false = wall, outside the building, or non-walkable structural element.
+   • Map the floor plan proportionally so the building fills most of the ${cols}×${rows} grid.
+   • PRESERVE the real shape. If the plan is L-shaped, T-shaped, or has cutouts, the grid must reflect that. Do NOT fill the entire grid as a solid rectangle.
+   • Outer boundary cells where the exterior is should be false.
+   • Interior partition walls between rooms should be false when the resolution allows.
+   • A normal floor plan should have roughly 40-80% true cells.
+
+3. DETECT ROOMS
+   • For every distinct room produce an object:
+     { "type": "<room_type>", "label": "<name>", "x": <col>, "y": <row>, "w": <width>, "h": <height> }
+   • type must be one of: ${ROOM_TYPES.join(', ')}.
+   • label is a short human-readable name like "Master Bedroom" or "Kitchen".
+   • x, y are 0-indexed top-left grid coordinates of the room's bounding rectangle.
+   • w, h are width and height in cells.
+   • Room rectangles must stay within the grid.
+   • Most cells inside the room rectangle should be true in the grid.
+
+EXAMPLE OUTPUT (for a small 8×6 grid with 2 rooms):
+{"grid":[[false,false,false,false,false,false,false,false],[false,true,true,true,false,true,true,false],[false,true,true,true,false,true,true,false],[false,true,true,true,false,true,true,false],[false,true,true,true,false,true,true,false],[false,false,false,false,false,false,false,false]],"rooms":[{"type":"living_room","label":"Living Room","x":1,"y":1,"w":3,"h":4},{"type":"bedroom","label":"Bedroom","x":5,"y":1,"w":2,"h":4}]}
+
+Return ONLY a valid JSON object. No markdown, no code fences, no explanation.`;
 }
 
 function extractJsonFromText(text: string): string {
@@ -49,24 +70,56 @@ function validateRoom(room: unknown, grid: boolean[][], cols: number, rows: numb
   const h = Number(r.h);
   if (!Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(w) || !Number.isInteger(h)) return false;
   if (w < 1 || h < 1 || x < 0 || y < 0 || x + w > cols || y + h > rows) return false;
+
+  // Relaxed validation: at least 40% of cells should be floor (allows walls/doors within room bounds)
+  let total = 0;
+  let floorCount = 0;
   for (let dy = 0; dy < h; dy++) {
     for (let dx = 0; dx < w; dx++) {
-      if (!grid[y + dy]?.[x + dx]) return false;
+      total++;
+      if (grid[y + dy]?.[x + dx]) floorCount++;
     }
   }
-  return true;
+  return total > 0 && floorCount / total >= 0.4;
+}
+
+function resampleGridServer(source: boolean[][], targetCols: number, targetRows: number): boolean[][] {
+  const srcRows = source.length;
+  const srcCols = source[0]?.length ?? 0;
+  if (srcRows === 0 || srcCols === 0) {
+    return Array.from({ length: targetRows }, () => Array(targetCols).fill(false));
+  }
+  return Array.from({ length: targetRows }, (_, y) => {
+    const srcY = Math.min(srcRows - 1, Math.floor((y * srcRows) / targetRows));
+    return Array.from({ length: targetCols }, (_, x) => {
+      const srcX = Math.min(srcCols - 1, Math.floor((x * srcCols) / targetCols));
+      return Boolean(source[srcY]?.[srcX]);
+    });
+  });
 }
 
 function validateAndNormalize(data: unknown, cols: number, rows: number): FloorPlanData {
   if (!data || typeof data !== 'object') throw new Error('Invalid response: not an object');
   const d = data as Record<string, unknown>;
   if (!Array.isArray(d.grid)) throw new Error('Invalid response: missing or invalid grid');
-  const grid = d.grid as unknown[];
-  if (grid.length !== rows) throw new Error(`Invalid response: grid must have ${rows} rows, got ${grid.length}`);
-  const normalizedGrid: boolean[][] = grid.map((row) => {
-    if (!Array.isArray(row) || row.length !== cols) throw new Error('Invalid response: each row must have ' + cols + ' columns');
-    return row.map((cell) => Boolean(cell));
-  });
+
+  const rawGrid = d.grid as unknown[];
+  let normalizedGrid: boolean[][];
+
+  if (rawGrid.length === rows && Array.isArray(rawGrid[0]) && (rawGrid[0] as unknown[]).length === cols) {
+    // Perfect match
+    normalizedGrid = rawGrid.map((row) => {
+      if (!Array.isArray(row)) return Array(cols).fill(false) as boolean[];
+      return row.map((cell) => Boolean(cell));
+    });
+  } else {
+    // Model returned wrong dimensions — resample to target
+    const tempGrid: boolean[][] = rawGrid.map((row) => {
+      if (!Array.isArray(row)) return Array(cols).fill(false);
+      return (row as unknown[]).map((cell) => Boolean(cell));
+    });
+    normalizedGrid = resampleGridServer(tempGrid, cols, rows);
+  }
 
   const rooms: Room[] = [];
   if (Array.isArray(d.rooms)) {
@@ -76,6 +129,58 @@ function validateAndNormalize(data: unknown, cols: number, rows: number): FloorP
   }
 
   return { grid: normalizedGrid, rooms };
+}
+
+/** Check if the grid is too sparse (probably a failed parse) */
+function gridFloorRatio(grid: boolean[][]): number {
+  let total = 0;
+  let floor = 0;
+  for (const row of grid) {
+    for (const cell of row) {
+      total++;
+      if (cell) floor++;
+    }
+  }
+  return total > 0 ? floor / total : 0;
+}
+
+async function callGemini(
+  apiKey: string,
+  mimeType: string,
+  base64Data: string,
+  cols: number,
+  rows: number
+): Promise<FloorPlanData> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    generationConfig: {
+      responseMimeType: 'application/json',
+    },
+  });
+
+  const prompt = buildPrompt(cols, rows);
+
+  const result = await model.generateContent([
+    { inlineData: { mimeType, data: base64Data } },
+    { text: prompt },
+  ]);
+
+  const response = result.response;
+  if (!response) throw new Error('No response from model');
+
+  const rawText = response.text();
+  if (!rawText) throw new Error('Empty response from model');
+
+  const jsonStr = extractJsonFromText(rawText);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    throw new Error(`Model did not return valid JSON: ${jsonStr.slice(0, 300)}`);
+  }
+
+  return validateAndNormalize(parsed, cols, rows);
 }
 
 export async function POST(request: Request) {
@@ -98,41 +203,35 @@ export async function POST(request: Request) {
     const mimeType = match ? match[1] : 'image/png';
     const base64Data = match ? match[2] : dataUri.replace(/^data:[^;]+;base64,/, '');
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      generationConfig: {
-        // @ts-expect-error -- thinkingConfig is supported by Gemini 2.5 but not yet in the SDK types
-        thinkingConfig: { thinkingBudget: 0 },
-      },
-    });
+    // Try up to 2 times — if first attempt produces a mostly-empty grid, retry once
+    let floorPlan: FloorPlanData | null = null;
+    let lastError: string | null = null;
 
-    const prompt = buildPrompt(cols, rows);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const result = await callGemini(apiKey, mimeType, base64Data, cols, rows);
+        const ratio = gridFloorRatio(result.grid);
 
-    const result = await model.generateContent([
-      { inlineData: { mimeType, data: base64Data } },
-      { text: prompt },
-    ]);
+        if (ratio < 0.1) {
+          // Grid is almost entirely empty — likely a failed parse
+          lastError = `Attempt ${attempt + 1}: grid was almost empty (${(ratio * 100).toFixed(0)}% floor). Retrying…`;
+          continue;
+        }
 
-    const response = result.response;
-    if (!response) {
-      return NextResponse.json({ error: 'No response from model' }, { status: 502 });
+        floorPlan = result;
+        break;
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : 'Unknown error';
+      }
     }
 
-    const rawText = response.text();
-    if (!rawText) {
-      return NextResponse.json({ error: 'Empty response from model' }, { status: 502 });
+    if (!floorPlan) {
+      return NextResponse.json(
+        { error: lastError || 'Failed to parse floor plan after retries' },
+        { status: 502 }
+      );
     }
 
-    const jsonStr = extractJsonFromText(rawText);
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(jsonStr);
-    } catch {
-      return NextResponse.json({ error: 'Model did not return valid JSON', details: jsonStr.slice(0, 200) }, { status: 502 });
-    }
-
-    const floorPlan = validateAndNormalize(parsed, cols, rows);
     return NextResponse.json(floorPlan);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Parse failed';
