@@ -135,6 +135,15 @@ const FURNITURE_CATALOG: Record<FurnitureType, FurniturePaletteItem> = {
   }
 };
 
+const ROOM_COLORS: Record<RoomType, { fill: string; label: string }> = {
+  bedroom: { fill: 'rgba(86, 140, 214, 0.65)', label: 'rgba(86, 140, 214, 0.9)' },
+  living_room: { fill: 'rgba(120, 201, 172, 0.6)', label: 'rgba(120, 201, 172, 0.9)' },
+  kitchen: { fill: 'rgba(242, 192, 107, 0.7)', label: 'rgba(242, 192, 107, 0.95)' },
+  bathroom: { fill: 'rgba(109, 178, 207, 0.65)', label: 'rgba(109, 178, 207, 0.95)' },
+  hallway: { fill: 'rgba(195, 164, 122, 0.6)', label: 'rgba(195, 164, 122, 0.9)' },
+  office: { fill: 'rgba(135, 206, 125, 0.6)', label: 'rgba(135, 206, 125, 0.9)' }
+};
+
 // Kenney sprite base tile is 208px wide; our TILE_WIDTH is 64
 const KENNEY_TILE_PX = 208;
 
@@ -317,6 +326,15 @@ function rotateItem(item: FurnitureItem, width: number, height: number, rotation
 
 function isFloorTile(grid: boolean[][], x: number, y: number): boolean {
   return grid[y]?.[x] ?? false;
+}
+
+function findRoomAt(rooms: Room[], x: number, y: number): Room | null {
+  for (const room of rooms) {
+    if (x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h) {
+      return room;
+    }
+  }
+  return null;
 }
 
 function canPlaceItem(
@@ -779,6 +797,7 @@ export default function RoomPlanner() {
           <IsoRoomCanvas
             grid={grid}
             baseGrid={baseGrid}
+            rooms={rooms}
             items={items}
             spriteImages={spriteImages}
             viewRotation={viewRotation}
@@ -804,6 +823,7 @@ export default function RoomPlanner() {
 type IsoRoomCanvasProps = {
   grid: boolean[][];
   baseGrid: boolean[][] | null;
+  rooms: Room[];
   items: FurnitureItem[];
   spriteImages: Record<string, HTMLImageElement>;
   viewRotation: ViewRotation;
@@ -815,6 +835,7 @@ type IsoRoomCanvasProps = {
 function IsoRoomCanvas({
   grid,
   baseGrid,
+  rooms,
   items,
   spriteImages,
   viewRotation,
@@ -911,6 +932,37 @@ function IsoRoomCanvas({
         ctx.lineWidth = 1;
         ctx.stroke();
       }
+    };
+
+    const drawLabelPill = (lx: number, ly: number, text: string, color: string) => {
+      ctx.save();
+      ctx.font = '600 12px "Space Grotesk", system-ui';
+      const px = 10;
+      const py = 6;
+      const metrics = ctx.measureText(text);
+      const w = metrics.width + px * 2;
+      const h = 20 + py;
+      const r = 10;
+      const left = lx - w / 2;
+      const top = ly - h / 2;
+      ctx.beginPath();
+      ctx.moveTo(left + r, top);
+      ctx.lineTo(left + w - r, top);
+      ctx.quadraticCurveTo(left + w, top, left + w, top + r);
+      ctx.lineTo(left + w, top + h - r);
+      ctx.quadraticCurveTo(left + w, top + h, left + w - r, top + h);
+      ctx.lineTo(left + r, top + h);
+      ctx.quadraticCurveTo(left, top + h, left, top + h - r);
+      ctx.lineTo(left, top + r);
+      ctx.quadraticCurveTo(left, top, left + r, top);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.fillStyle = '#0b0f14';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, lx, ly + 1);
+      ctx.restore();
     };
 
     const drawNorthWall = (x: number, y: number) => {
@@ -1034,13 +1086,15 @@ function IsoRoomCanvas({
       ctx.stroke();
     };
 
-    // Draw floor tiles
+    // Draw floor tiles (color-coded by room type)
     for (let y = 0; y < viewHeight; y += 1) {
       for (let x = 0; x < viewWidth; x += 1) {
         const original = toOriginal(x, y, gridWidth, gridHeight, viewRotation);
         if (!isFloorTile(grid, original.x, original.y)) continue;
+        const room = findRoomAt(rooms, original.x, original.y);
         const { screenX, screenY } = gridToScreen(x, y, offsetX, offsetY);
-        drawDiamond(screenX, screenY, 'rgba(55, 77, 95, 0.75)', 'rgba(36, 55, 70, 0.8)');
+        const fill = room ? ROOM_COLORS[room.type].fill : 'rgba(55, 77, 95, 0.75)';
+        drawDiamond(screenX, screenY, fill, 'rgba(36, 55, 70, 0.8)');
       }
     }
 
@@ -1058,6 +1112,19 @@ function IsoRoomCanvas({
         if (!isFloorTile(grid, originalWest.x, originalWest.y)) {
           drawWestWall(screenX, screenY);
         }
+      }
+    }
+
+    // Draw room labels
+    if (rooms.length > 0) {
+      for (const room of rooms) {
+        const centerX = room.x + room.w / 2;
+        const centerY = room.y + room.h / 2;
+        const viewCenter = toRotated(centerX, centerY, gridWidth, gridHeight, viewRotation);
+        const { screenX, screenY } = gridToScreen(viewCenter.x, viewCenter.y, offsetX, offsetY);
+        const labelX = screenX + TILE_WIDTH / 2;
+        const labelY = screenY + TILE_HEIGHT / 2 - 18;
+        drawLabelPill(labelX, labelY, room.label, ROOM_COLORS[room.type].label);
       }
     }
 
@@ -1084,6 +1151,7 @@ function IsoRoomCanvas({
     gridWidth,
     pan.x,
     pan.y,
+    rooms,
     selectedItemId,
     spriteImages,
     viewHeight,
