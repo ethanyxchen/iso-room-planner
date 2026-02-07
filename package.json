@@ -1,0 +1,25 @@
+{
+  "name": "hackajohn-room-planner",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "isometric-city": "file:./packages/isometric-city",
+    "next": "^16.1.1",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "^16.1.1",
+    "typescript": "^5"
+  }
+}
