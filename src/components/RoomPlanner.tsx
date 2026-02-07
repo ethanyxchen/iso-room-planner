@@ -3,21 +3,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { gridToScreen, screenToGrid } from '@isocity/components/game/utils';
 import { TILE_HEIGHT, TILE_WIDTH } from '@isocity/components/game/types';
+import type { FloorPlanData, Room, RoomType } from '@/types/floorplan';
 
 type Tool = 'floor' | 'erase' | 'furniture';
 
 type FurnitureType = 'sofa' | 'bed' | 'table' | 'chair' | 'plant';
-
-type RoomType = 'bedroom' | 'living_room' | 'kitchen' | 'bathroom' | 'hallway' | 'office';
-
-type Room = {
-  type: RoomType;
-  label: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-};
 
 type FurnitureItem = {
   id: string;
@@ -214,16 +204,22 @@ export default function RoomPlanner() {
     buildItem('bed', 7, 2, 0),
     buildItem('plant', 1, 5, 0)
   ]);
+  const [rooms, setRooms] = useState<Room[]>(() => MOCK_ROOMS);
   const [tool, setTool] = useState<Tool>('floor');
   const [activeFurniture, setActiveFurniture] = useState<FurnitureType>('sofa');
   const [rotation, setRotation] = useState<0 | 90>(0);
   const [status, setStatus] = useState<string>('Drag furniture in the isometric view to move it.');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [rooms] = useState<Room[]>(() => MOCK_ROOMS);
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const gridWidth = grid[0]?.length ?? 0;
   const gridHeight = grid.length;
   const roomCount = rooms.length;
+
   const handleDownload = useCallback(() => {
     const canvas = isoCanvasRef.current;
     if (!canvas) return;
@@ -280,6 +276,7 @@ export default function RoomPlanner() {
       buildItem('bed', 7, 2, 0),
       buildItem('plant', 1, 5, 0)
     ]);
+    setRooms(MOCK_ROOMS);
     setStatus('Reset to a clean, playable scene.');
   }, []);
 
@@ -289,14 +286,74 @@ export default function RoomPlanner() {
     setStatus('Cleared all furniture.');
   }, []);
 
+  const onFloorPlanParsed = useCallback((data: FloorPlanData) => {
+    setGrid(data.grid);
+    setRooms(data.rooms);
+    setItems([]);
+    setSelectedItemId(null);
+    setUploadPreview(null);
+    setUploadError(null);
+    setStatus(`Loaded floor plan with ${data.rooms.length} room(s). Use Auto-Furnish or place furniture manually.`);
+  }, []);
+
+  const readFileAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const handleFiles = useCallback(
+    (files: FileList | null) => {
+      if (!files?.length) return;
+      const file = files[0];
+      if (!file.type.startsWith('image/')) {
+        setUploadError('Please choose an image file (PNG, JPEG, etc.).');
+        return;
+      }
+      setUploadError(null);
+      readFileAsDataUrl(file).then(setUploadPreview);
+    },
+    []
+  );
+
+  const handleAnalyze = useCallback(async () => {
+    if (!uploadPreview) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const res = await fetch('/api/parse-floorplan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: uploadPreview }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUploadError(data?.error ?? 'Analysis failed.');
+        return;
+      }
+      onFloorPlanParsed(data as FloorPlanData);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Network error.');
+    } finally {
+      setUploading(false);
+    }
+  }, [uploadPreview, onFloorPlanParsed]);
+
+  const handleTryAgain = useCallback(() => {
+    setUploadError(null);
+    if (uploadPreview) handleAnalyze();
+  }, [uploadPreview, handleAnalyze]);
+
   return (
     <>
       <section className="planner">
         <div className="canvas-layer">
           <IsoRoomCanvas
             grid={grid}
-            items={items}
             rooms={rooms}
+            items={items}
             onMoveItem={(id, nextX, nextY) => {
               setItems((prev) =>
                 prev.map((item) =>
@@ -319,6 +376,61 @@ export default function RoomPlanner() {
           </div>
 
           <div className="hud-right">
+            <div className="hud-panel">
+              <h2>Upload Floor Plan</h2>
+              <div
+                className={`upload-zone ${dragOver ? 'dragover' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="upload-input"
+                  onChange={(e) => handleFiles(e.target.files)}
+                />
+                {uploadPreview ? (
+                  <div className="upload-preview">
+                    <img src={uploadPreview} alt="Floor plan preview" />
+                    <div className="upload-actions">
+                      <button
+                        type="button"
+                        className="action-button primary"
+                        onClick={(e) => { e.stopPropagation(); handleAnalyze(); }}
+                        disabled={uploading}
+                      >
+                        {uploading ? (
+                          <>
+                            <span className="spinner" /> Analyzing…
+                          </>
+                        ) : (
+                          'Analyze Floor Plan'
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className="tool-button"
+                        onClick={(e) => { e.stopPropagation(); setUploadPreview(null); setUploadError(null); }}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p>Drop a floor plan image here or click to browse</p>
+                )}
+              </div>
+              {uploadError && (
+                <div className="upload-error">
+                  <span>{uploadError}</span>
+                  <button type="button" className="tool-button" onClick={handleTryAgain}>Try Again</button>
+                </div>
+              )}
+            </div>
+
             <div className="hud-panel">
               <h2>Floor Plan</h2>
               <div className="tool-row">
@@ -434,8 +546,8 @@ export default function RoomPlanner() {
 
 type IsoRoomCanvasProps = {
   grid: boolean[][];
-  items: FurnitureItem[];
   rooms: Room[];
+  items: FurnitureItem[];
   onMoveItem: (id: string, x: number, y: number) => void;
   selectedItemId: string | null;
   onSelectItem: (id: string | null) => void;
