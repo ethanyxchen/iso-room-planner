@@ -118,16 +118,54 @@ a {
   transform: translateY(-1px);
 }
 
+.granularity-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.granularity-row > label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+}
+
+.granularity-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.granularity-controls input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent-2);
+  cursor: pointer;
+}
+
+.granularity-value {
+  min-width: 36px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.granularity-note {
+  font-size: 0.75rem;
+  color: var(--accent-2);
+}
+
 .grid {
   display: grid;
   border: 1px solid var(--grid);
   border-radius: 12px;
-  overflow: hidden;
+  overflow: auto;
+  max-width: 100%;
 }
 
 .grid-cell {
-  width: 28px;
-  height: 28px;
   border-right: 1px solid var(--grid);
   border-bottom: 1px solid var(--grid);
   display: flex;
@@ -260,18 +298,10 @@ a {
   line-height: 1.5;
 }
 
-/* ---- Upload Section ---- */
-
-.upload-section {
-  padding: 0 24px;
-  margin-bottom: 4px;
-}
-
-.upload-section .panel {
-  max-width: 600px;
-}
+/* ---- Upload Zone ---- */
 
 .upload-zone {
+  margin-bottom: 16px;
   border: 2px dashed var(--panel-border);
   border-radius: 14px;
   padding: 24px;

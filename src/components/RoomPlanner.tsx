@@ -186,9 +186,63 @@ function useSpriteImages(spriteMap: Partial<Record<FurnitureType, SpriteInfo>>):
 
 const DEFAULT_WIDTH = 12;
 const DEFAULT_HEIGHT = 8;
+const MAX_COLS = 96;
+const MAX_ROWS = 72;
 
 function createFloor(width: number, height: number): boolean[][] {
   return Array.from({ length: height }, () => Array.from({ length: width }, () => true));
+}
+
+function resampleGrid(baseGrid: boolean[][], targetCols: number, targetRows: number): boolean[][] {
+  const srcRows = baseGrid.length;
+  const srcCols = baseGrid[0]?.length ?? 0;
+  if (srcRows === 0 || srcCols === 0) return [];
+
+  return Array.from({ length: targetRows }, (_, y) => {
+    const y0 = Math.floor((y * srcRows) / targetRows);
+    const y1 = Math.max(y0, Math.floor(((y + 1) * srcRows) / targetRows) - 1);
+    return Array.from({ length: targetCols }, (_, x) => {
+      const x0 = Math.floor((x * srcCols) / targetCols);
+      const x1 = Math.max(x0, Math.floor(((x + 1) * srcCols) / targetCols) - 1);
+      let total = 0;
+      let on = 0;
+      for (let sy = y0; sy <= y1; sy += 1) {
+        for (let sx = x0; sx <= x1; sx += 1) {
+          total += 1;
+          if (baseGrid[sy]?.[sx]) on += 1;
+        }
+      }
+      if (total === 0) {
+        const sx = Math.min(srcCols - 1, Math.floor((x * srcCols) / targetCols));
+        const sy = Math.min(srcRows - 1, Math.floor((y * srcRows) / targetRows));
+        return Boolean(baseGrid[sy]?.[sx]);
+      }
+      return on / total >= 0.5;
+    });
+  });
+}
+
+function scaleRooms(
+  rooms: Room[],
+  srcCols: number,
+  srcRows: number,
+  targetCols: number,
+  targetRows: number
+): Room[] {
+  if (srcCols === 0 || srcRows === 0) return [];
+  const scaleX = targetCols / srcCols;
+  const scaleY = targetRows / srcRows;
+  return rooms.map((room) => {
+    let x = Math.round(room.x * scaleX);
+    let y = Math.round(room.y * scaleY);
+    let w = Math.max(1, Math.round(room.w * scaleX));
+    let h = Math.max(1, Math.round(room.h * scaleY));
+    x = Math.max(0, Math.min(targetCols - 1, x));
+    y = Math.max(0, Math.min(targetRows - 1, y));
+    if (x + w > targetCols) w = Math.max(1, targetCols - x);
+    if (y + h > targetRows) h = Math.max(1, targetRows - y);
+    return { ...room, x, y, w, h };
+  });
 }
 
 function createId(): string {
@@ -318,6 +372,9 @@ export default function RoomPlanner() {
   const [status, setStatus] = useState<string>('Drag furniture in the isometric view to move it.');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [baseGrid, setBaseGrid] = useState<boolean[][] | null>(() => createFloor(DEFAULT_WIDTH, DEFAULT_HEIGHT));
+  const [baseRooms, setBaseRooms] = useState<Room[]>([]);
+  const [granularity, setGranularity] = useState(1);
 
   // Upload state
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
@@ -345,6 +402,9 @@ export default function RoomPlanner() {
   const onFloorPlanParsed = useCallback((data: FloorPlanData) => {
     setGrid(data.grid);
     setRooms(data.rooms);
+    setBaseGrid(data.grid);
+    setBaseRooms(data.rooms);
+    setGranularity(1);
     setItems([]);
     setSelectedItemId(null);
     setStatus('Floor plan loaded! Drop furniture or use auto-furnish.');
@@ -434,6 +494,9 @@ export default function RoomPlanner() {
   const resetScene = useCallback(() => {
     const nextGrid = createFloor(DEFAULT_WIDTH, DEFAULT_HEIGHT);
     setGrid(nextGrid);
+    setBaseGrid(nextGrid);
+    setBaseRooms([]);
+    setGranularity(1);
     setItems([
       buildItem('sofa', 2, 2, 0),
       buildItem('table', 5, 3, 0),
@@ -449,6 +512,34 @@ export default function RoomPlanner() {
     setStatus('Cleared all furniture.');
   }, []);
 
+  const maxGranularity = useMemo(() => {
+    if (!baseGrid || baseGrid.length === 0 || baseGrid[0]?.length === 0) return 1;
+    const baseCols = baseGrid[0].length;
+    const baseRows = baseGrid.length;
+    return Math.max(1, Math.min(Math.floor(MAX_COLS / baseCols), Math.floor(MAX_ROWS / baseRows)));
+  }, [baseGrid]);
+
+  const prevGranRef = useRef(granularity);
+  useEffect(() => {
+    if (!baseGrid || baseGrid.length === 0 || baseGrid[0]?.length === 0) return;
+    const baseCols = baseGrid[0].length;
+    const baseRows = baseGrid.length;
+    const factor = Math.max(1, Math.min(granularity, maxGranularity));
+    const targetCols = baseCols * factor;
+    const targetRows = baseRows * factor;
+
+    // Skip if nothing actually changed (avoids clearing items on mount)
+    if (factor === prevGranRef.current && grid.length === targetRows && (grid[0]?.length ?? 0) === targetCols) {
+      return;
+    }
+    prevGranRef.current = factor;
+
+    setGrid(resampleGrid(baseGrid, targetCols, targetRows));
+    setRooms(scaleRooms(baseRooms, baseCols, baseRows, targetCols, targetRows));
+    setItems([]);
+    setSelectedItemId(null);
+  }, [baseGrid, baseRooms, granularity, maxGranularity, grid]);
+
   return (
     <>
       <header className="header">
@@ -456,9 +547,10 @@ export default function RoomPlanner() {
         <p>Sketch a floor plan, then watch it snap into a cozy isometric room. Drop furniture on the plan or drag it around in the 3D view.</p>
       </header>
 
-      <section className="upload-section">
+      <section className="main">
         <div className="panel">
-          <h2>Upload Floor Plan</h2>
+          <h2>Floor Plan</h2>
+
           <div
             className={`upload-zone ${dragOver ? 'dragover' : ''}`}
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -510,12 +602,6 @@ export default function RoomPlanner() {
               <button type="button" className="tool-button" onClick={handleTryAgain}>Try Again</button>
             </div>
           )}
-        </div>
-      </section>
-
-      <section className="main">
-        <div className="panel">
-          <h2>Floor Plan</h2>
           <div className="tool-row">
             <button
               className={`tool-button ${tool === 'floor' ? 'active' : ''}`}
@@ -568,9 +654,27 @@ export default function RoomPlanner() {
             </button>
           </div>
 
+          <div className="granularity-row">
+            <label>Granularity</label>
+            <div className="granularity-controls">
+              <input
+                type="range"
+                min={1}
+                max={maxGranularity}
+                value={granularity}
+                onChange={(e) => setGranularity(Number(e.target.value))}
+                disabled={maxGranularity <= 1}
+              />
+              <span className="granularity-value">{granularity}x</span>
+            </div>
+            <span className="granularity-note">
+              {gridWidth}x{gridHeight} tiles &mdash; slide to change detail
+            </span>
+          </div>
+
           <div
             className="grid"
-            style={{ gridTemplateColumns: `repeat(${gridWidth}, 28px)` }}
+            style={{ gridTemplateColumns: `repeat(${gridWidth}, ${Math.max(12, Math.floor(336 / gridWidth))}px)` }}
           >
             {grid.map((row, y) =>
               row.map((cell, x) => {
@@ -583,11 +687,14 @@ export default function RoomPlanner() {
                     className={`grid-cell ${cell ? 'floor' : 'blocked'}`}
                     onClick={() => handleCellClick(x, y)}
                     title={cell ? 'Floor' : 'Empty'}
-                    style={
-                      itemType
+                    style={{
+                      width: Math.max(12, Math.floor(336 / gridWidth)),
+                      height: Math.max(12, Math.floor(336 / gridWidth)),
+                      fontSize: gridWidth > 24 ? '0.4rem' : '0.65rem',
+                      ...(itemType
                         ? { background: FURNITURE_CATALOG[itemType].swatch, color: '#0b0f14' }
-                        : undefined
-                    }
+                        : {}),
+                    }}
                   >
                     {itemType ? itemType[0].toUpperCase() : ''}
                   </button>
