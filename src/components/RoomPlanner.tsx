@@ -9,6 +9,8 @@ type Tool = 'floor' | 'erase' | 'furniture';
 
 type FurnitureType = 'sofa' | 'bed' | 'table' | 'chair' | 'plant' | 'bookshelf' | 'lamp' | 'nightstand' | 'stove' | 'television';
 
+type Rotation = 0 | 90 | 180 | 270;
+
 type FurnitureItem = {
   id: string;
   type: FurnitureType;
@@ -133,6 +135,15 @@ const FURNITURE_CATALOG: Record<FurnitureType, FurniturePaletteItem> = {
   }
 };
 
+const ROOM_COLORS: Record<RoomType, { fill: string; label: string }> = {
+  bedroom: { fill: 'rgba(86, 140, 214, 0.65)', label: 'rgba(86, 140, 214, 0.9)' },
+  living_room: { fill: 'rgba(120, 201, 172, 0.6)', label: 'rgba(120, 201, 172, 0.9)' },
+  kitchen: { fill: 'rgba(242, 192, 107, 0.7)', label: 'rgba(242, 192, 107, 0.95)' },
+  bathroom: { fill: 'rgba(109, 178, 207, 0.65)', label: 'rgba(109, 178, 207, 0.95)' },
+  hallway: { fill: 'rgba(195, 164, 122, 0.6)', label: 'rgba(195, 164, 122, 0.9)' },
+  office: { fill: 'rgba(135, 206, 125, 0.6)', label: 'rgba(135, 206, 125, 0.9)' }
+};
+
 // Kenney sprite base tile is 208px wide; our TILE_WIDTH is 64
 const KENNEY_TILE_PX = 208;
 
@@ -243,6 +254,70 @@ function scaleRooms(
     if (y + h > targetRows) h = Math.max(1, targetRows - y);
     return { ...room, x, y, w, h };
   });
+}
+
+function getRotatedDims(width: number, height: number, rotation: Rotation): { width: number; height: number } {
+  if (rotation === 90 || rotation === 270) {
+    return { width: height, height: width };
+  }
+  return { width, height };
+}
+
+function rotatePoint(x: number, y: number, rotation: Rotation, width: number, height: number): { x: number; y: number } {
+  switch (rotation) {
+    case 90:
+      return { x: height - 1 - y, y: x };
+    case 180:
+      return { x: width - 1 - x, y: height - 1 - y };
+    case 270:
+      return { x: y, y: width - 1 - x };
+    default:
+      return { x, y };
+  }
+}
+
+function unrotatePoint(x: number, y: number, rotation: Rotation, width: number, height: number): { x: number; y: number } {
+  switch (rotation) {
+    case 90:
+      return { x: y, y: height - 1 - x };
+    case 180:
+      return { x: width - 1 - x, y: height - 1 - y };
+    case 270:
+      return { x: width - 1 - y, y: x };
+    default:
+      return { x, y };
+  }
+}
+
+function getItemViewBounds(
+  item: FurnitureItem,
+  rotation: Rotation,
+  gridWidth: number,
+  gridHeight: number
+): { minX: number; minY: number; maxX: number; maxY: number } {
+  const corners = [
+    rotatePoint(item.x, item.y, rotation, gridWidth, gridHeight),
+    rotatePoint(item.x + item.w - 1, item.y, rotation, gridWidth, gridHeight),
+    rotatePoint(item.x + item.w - 1, item.y + item.h - 1, rotation, gridWidth, gridHeight),
+    rotatePoint(item.x, item.y + item.h - 1, rotation, gridWidth, gridHeight)
+  ];
+  const xs = corners.map((corner) => corner.x);
+  const ys = corners.map((corner) => corner.y);
+  return {
+    minX: Math.min(...xs),
+    maxX: Math.max(...xs),
+    minY: Math.min(...ys),
+    maxY: Math.max(...ys)
+  };
+}
+
+function findRoomAt(rooms: Room[], x: number, y: number): Room | null {
+  for (const room of rooms) {
+    if (x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h) {
+      return room;
+    }
+  }
+  return null;
 }
 
 function createId(): string {
@@ -368,7 +443,8 @@ export default function RoomPlanner() {
   ]);
   const [tool, setTool] = useState<Tool>('floor');
   const [activeFurniture, setActiveFurniture] = useState<FurnitureType>('sofa');
-  const [rotation, setRotation] = useState<0 | 90>(0);
+  const [rotation] = useState<0 | 90>(0);
+  const [viewRotation, setViewRotation] = useState<Rotation>(0);
   const [status, setStatus] = useState<string>('Drag furniture in the isometric view to move it.');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -387,6 +463,13 @@ export default function RoomPlanner() {
 
   const gridWidth = grid[0]?.length ?? 0;
   const gridHeight = grid.length;
+
+  const cycleViewRotation = useCallback(() => {
+    setViewRotation((prev) => {
+      const next = (prev + 90) % 360;
+      return next as Rotation;
+    });
+  }, []);
 
   const occupancy = useMemo(() => {
     const map = new Map<string, FurnitureType>();
@@ -644,16 +727,6 @@ export default function RoomPlanner() {
             ))}
           </div>
 
-          <div className="tool-row">
-            <button
-              className="tool-button"
-              onClick={() => setRotation((prev) => (prev === 0 ? 90 : 0))}
-              type="button"
-            >
-              Rotate {rotation === 0 ? '0°' : '90°'}
-            </button>
-          </div>
-
           <div className="granularity-row">
             <label>Granularity</label>
             <div className="granularity-controls">
@@ -721,6 +794,8 @@ export default function RoomPlanner() {
           <IsoRoomCanvas
             grid={grid}
             items={items}
+            rooms={rooms}
+            viewRotation={viewRotation}
             spriteImages={spriteImages}
             onMoveItem={(id, nextX, nextY) => {
               setItems((prev) =>
@@ -734,6 +809,11 @@ export default function RoomPlanner() {
             selectedItemId={selectedItemId}
             onSelectItem={setSelectedItemId}
           />
+          <div className="actions">
+            <button className="action-button" onClick={cycleViewRotation} type="button">
+              Rotate View {viewRotation}°
+            </button>
+          </div>
           <div className="status">{status}</div>
         </div>
       </section>
@@ -744,13 +824,15 @@ export default function RoomPlanner() {
 type IsoRoomCanvasProps = {
   grid: boolean[][];
   items: FurnitureItem[];
+  rooms: Room[];
+  viewRotation: Rotation;
   spriteImages: Record<string, HTMLImageElement>;
   onMoveItem: (id: string, x: number, y: number) => void;
   selectedItemId: string | null;
   onSelectItem: (id: string | null) => void;
 };
 
-function IsoRoomCanvas({ grid, items, spriteImages, onMoveItem, selectedItemId, onSelectItem }: IsoRoomCanvasProps) {
+function IsoRoomCanvas({ grid, items, rooms, viewRotation, spriteImages, onMoveItem, selectedItemId, onSelectItem }: IsoRoomCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const offsetRef = useRef({ x: 0, y: 0 });
@@ -759,6 +841,7 @@ function IsoRoomCanvas({ grid, items, spriteImages, onMoveItem, selectedItemId, 
 
   const gridWidth = grid[0]?.length ?? 0;
   const gridHeight = grid.length;
+  const { width: viewWidth, height: viewHeight } = getRotatedDims(gridWidth, gridHeight, viewRotation);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -787,9 +870,9 @@ function IsoRoomCanvas({ grid, items, spriteImages, onMoveItem, selectedItemId, 
     const wallHeight = 42;
     const corners = [
       gridToScreen(0, 0, 0, 0),
-      gridToScreen(gridWidth - 1, 0, 0, 0),
-      gridToScreen(0, gridHeight - 1, 0, 0),
-      gridToScreen(gridWidth - 1, gridHeight - 1, 0, 0)
+      gridToScreen(viewWidth - 1, 0, 0, 0),
+      gridToScreen(0, viewHeight - 1, 0, 0),
+      gridToScreen(viewWidth - 1, viewHeight - 1, 0, 0)
     ];
 
     const minX = Math.min(...corners.map((c) => c.screenX));
@@ -818,6 +901,40 @@ function IsoRoomCanvas({ grid, items, spriteImages, onMoveItem, selectedItemId, 
         ctx.lineWidth = 1;
         ctx.stroke();
       }
+    };
+
+    const drawLabelPill = (x: number, y: number, text: string, color: string) => {
+      ctx.save();
+      ctx.font = '600 12px "Space Grotesk", system-ui';
+      const paddingX = 10;
+      const paddingY = 6;
+      const metrics = ctx.measureText(text);
+      const width = metrics.width + paddingX * 2;
+      const height = 20 + paddingY;
+      const radius = 10;
+
+      const left = x - width / 2;
+      const top = y - height / 2;
+
+      ctx.beginPath();
+      ctx.moveTo(left + radius, top);
+      ctx.lineTo(left + width - radius, top);
+      ctx.quadraticCurveTo(left + width, top, left + width, top + radius);
+      ctx.lineTo(left + width, top + height - radius);
+      ctx.quadraticCurveTo(left + width, top + height, left + width - radius, top + height);
+      ctx.lineTo(left + radius, top + height);
+      ctx.quadraticCurveTo(left, top + height, left, top + height - radius);
+      ctx.lineTo(left, top + radius);
+      ctx.quadraticCurveTo(left, top, left + radius, top);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+
+      ctx.fillStyle = '#0b0f14';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, x, y + 1);
+      ctx.restore();
     };
 
     const drawNorthWall = (x: number, y: number) => {
@@ -850,14 +967,23 @@ function IsoRoomCanvas({ grid, items, spriteImages, onMoveItem, selectedItemId, 
       ctx.stroke();
     };
 
+    const isFloorAtView = (vx: number, vy: number): boolean => {
+      if (vx < 0 || vy < 0 || vx >= viewWidth || vy >= viewHeight) return false;
+      const original = unrotatePoint(vx, vy, viewRotation, gridWidth, gridHeight);
+      return isFloorTile(grid, original.x, original.y);
+    };
+
+    const toView = (x: number, y: number) => rotatePoint(x, y, viewRotation, gridWidth, gridHeight);
+
     const drawCuboid = (item: FurnitureItem) => {
       const palette = FURNITURE_CATALOG[item.type];
       const height = palette.height;
 
-      const top = gridToScreen(item.x, item.y, offsetX, offsetY);
-      const right = gridToScreen(item.x + item.w, item.y, offsetX, offsetY);
-      const bottom = gridToScreen(item.x + item.w, item.y + item.h, offsetX, offsetY);
-      const left = gridToScreen(item.x, item.y + item.h, offsetX, offsetY);
+      const bounds = getItemViewBounds(item, viewRotation, gridWidth, gridHeight);
+      const top = gridToScreen(bounds.minX, bounds.minY, offsetX, offsetY);
+      const right = gridToScreen(bounds.maxX + 1, bounds.minY, offsetX, offsetY);
+      const bottom = gridToScreen(bounds.maxX + 1, bounds.maxY + 1, offsetX, offsetY);
+      const left = gridToScreen(bounds.minX, bounds.maxY + 1, offsetX, offsetY);
 
       const topPoint = { x: top.screenX + TILE_WIDTH / 2, y: top.screenY - height };
       const rightPoint = { x: right.screenX + TILE_WIDTH / 2, y: right.screenY - height };
@@ -902,8 +1028,9 @@ function IsoRoomCanvas({ grid, items, spriteImages, onMoveItem, selectedItemId, 
       const dh = info.ph * scale;
 
       // The footprint diamond center in screen coords
-      const topCorner = gridToScreen(item.x, item.y, offsetX, offsetY);
-      const bottomCorner = gridToScreen(item.x + item.w, item.y + item.h, offsetX, offsetY);
+      const bounds = getItemViewBounds(item, viewRotation, gridWidth, gridHeight);
+      const topCorner = gridToScreen(bounds.minX, bounds.minY, offsetX, offsetY);
+      const bottomCorner = gridToScreen(bounds.maxX + 1, bounds.maxY + 1, offsetX, offsetY);
 
       // Center of the footprint diamond
       const centerX = (topCorner.screenX + bottomCorner.screenX) / 2 + TILE_WIDTH / 2;
@@ -918,10 +1045,11 @@ function IsoRoomCanvas({ grid, items, spriteImages, onMoveItem, selectedItemId, 
     };
 
     const drawSelectionHighlight = (item: FurnitureItem) => {
-      const top = gridToScreen(item.x, item.y, offsetX, offsetY);
-      const right = gridToScreen(item.x + item.w, item.y, offsetX, offsetY);
-      const bottom = gridToScreen(item.x + item.w, item.y + item.h, offsetX, offsetY);
-      const left = gridToScreen(item.x, item.y + item.h, offsetX, offsetY);
+      const bounds = getItemViewBounds(item, viewRotation, gridWidth, gridHeight);
+      const top = gridToScreen(bounds.minX, bounds.minY, offsetX, offsetY);
+      const right = gridToScreen(bounds.maxX + 1, bounds.minY, offsetX, offsetY);
+      const bottom = gridToScreen(bounds.maxX + 1, bounds.maxY + 1, offsetX, offsetY);
+      const left = gridToScreen(bounds.minX, bounds.maxY + 1, offsetX, offsetY);
 
       const topPoint = { x: top.screenX + TILE_WIDTH / 2, y: top.screenY };
       const rightPoint = { x: right.screenX + TILE_WIDTH / 2, y: right.screenY };
@@ -942,30 +1070,49 @@ function IsoRoomCanvas({ grid, items, spriteImages, onMoveItem, selectedItemId, 
     };
 
     // Draw floor tiles
-    for (let y = 0; y < gridHeight; y += 1) {
-      for (let x = 0; x < gridWidth; x += 1) {
-        if (!isFloorTile(grid, x, y)) continue;
-        const { screenX, screenY } = gridToScreen(x, y, offsetX, offsetY);
-        drawDiamond(screenX, screenY, 'rgba(55, 77, 95, 0.75)', 'rgba(36, 55, 70, 0.8)');
+    for (let vy = 0; vy < viewHeight; vy += 1) {
+      for (let vx = 0; vx < viewWidth; vx += 1) {
+        if (!isFloorAtView(vx, vy)) continue;
+        const original = unrotatePoint(vx, vy, viewRotation, gridWidth, gridHeight);
+        const room = findRoomAt(rooms, original.x, original.y);
+        const { screenX, screenY } = gridToScreen(vx, vy, offsetX, offsetY);
+        const fill = room ? ROOM_COLORS[room.type].fill : 'rgba(55, 77, 95, 0.75)';
+        drawDiamond(screenX, screenY, fill, 'rgba(36, 55, 70, 0.8)');
       }
     }
 
     // Draw walls
-    for (let y = 0; y < gridHeight; y += 1) {
-      for (let x = 0; x < gridWidth; x += 1) {
-        if (!isFloorTile(grid, x, y)) continue;
-        const { screenX, screenY } = gridToScreen(x, y, offsetX, offsetY);
-        if (!isFloorTile(grid, x, y - 1)) {
+    for (let vy = 0; vy < viewHeight; vy += 1) {
+      for (let vx = 0; vx < viewWidth; vx += 1) {
+        if (!isFloorAtView(vx, vy)) continue;
+        const { screenX, screenY } = gridToScreen(vx, vy, offsetX, offsetY);
+        if (!isFloorAtView(vx, vy - 1)) {
           drawNorthWall(screenX, screenY);
         }
-        if (!isFloorTile(grid, x - 1, y)) {
+        if (!isFloorAtView(vx - 1, vy)) {
           drawWestWall(screenX, screenY);
         }
       }
     }
 
+    if (rooms.length > 0) {
+      for (const room of rooms) {
+        const centerX = room.x + room.w / 2;
+        const centerY = room.y + room.h / 2;
+        const viewCenter = toView(centerX, centerY);
+        const { screenX, screenY } = gridToScreen(viewCenter.x, viewCenter.y, offsetX, offsetY);
+        const labelX = screenX + TILE_WIDTH / 2;
+        const labelY = screenY + TILE_HEIGHT / 2 - 18;
+        drawLabelPill(labelX, labelY, room.label, ROOM_COLORS[room.type].label);
+      }
+    }
+
     // Draw furniture items sorted by depth
-    const sortedItems = [...items].sort((a, b) => (a.x + a.y) - (b.x + b.y));
+    const sortedItems = [...items].sort((a, b) => {
+      const aBounds = getItemViewBounds(a, viewRotation, gridWidth, gridHeight);
+      const bBounds = getItemViewBounds(b, viewRotation, gridWidth, gridHeight);
+      return (aBounds.maxX + aBounds.maxY) - (bBounds.maxX + bBounds.maxY);
+    });
     for (const item of sortedItems) {
       const img = spriteImages[item.type];
       if (img && SPRITE_MAP[item.type]) {
@@ -978,7 +1125,7 @@ function IsoRoomCanvas({ grid, items, spriteImages, onMoveItem, selectedItemId, 
         drawSelectionHighlight(item);
       }
     }
-  }, [canvasSize, grid, gridHeight, gridWidth, items, selectedItemId, spriteImages]);
+  }, [canvasSize, grid, gridHeight, gridWidth, items, rooms, selectedItemId, spriteImages, viewRotation, viewHeight, viewWidth]);
 
   useEffect(() => {
     drawScene();
@@ -990,16 +1137,17 @@ function IsoRoomCanvas({ grid, items, spriteImages, onMoveItem, selectedItemId, 
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
-    const { gridX, gridY } = screenToGrid(x, y, offsetRef.current.x, offsetRef.current.y);
+    const viewCoord = screenToGrid(x, y, offsetRef.current.x, offsetRef.current.y);
+    const original = unrotatePoint(viewCoord.gridX, viewCoord.gridY, viewRotation, gridWidth, gridHeight);
 
-    const item = findItemAt(items, gridX, gridY);
+    const item = findItemAt(items, original.x, original.y);
     if (item) {
-      dragRef.current = { id: item.id, offsetX: gridX - item.x, offsetY: gridY - item.y };
+      dragRef.current = { id: item.id, offsetX: original.x - item.x, offsetY: original.y - item.y };
       onSelectItem(item.id);
     } else {
       onSelectItem(null);
     }
-  }, [items, onSelectItem]);
+  }, [items, onSelectItem, viewRotation, gridWidth, gridHeight]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
     if (!dragRef.current) return;
@@ -1008,17 +1156,18 @@ function IsoRoomCanvas({ grid, items, spriteImages, onMoveItem, selectedItemId, 
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
-    const { gridX, gridY } = screenToGrid(x, y, offsetRef.current.x, offsetRef.current.y);
+    const viewCoord = screenToGrid(x, y, offsetRef.current.x, offsetRef.current.y);
+    const original = unrotatePoint(viewCoord.gridX, viewCoord.gridY, viewRotation, gridWidth, gridHeight);
     const active = items.find((item) => item.id === dragRef.current?.id);
     if (!active) return;
 
-    const nextX = clamp(gridX - dragRef.current.offsetX, 0, gridWidth - active.w);
-    const nextY = clamp(gridY - dragRef.current.offsetY, 0, gridHeight - active.h);
+    const nextX = clamp(original.x - dragRef.current.offsetX, 0, gridWidth - active.w);
+    const nextY = clamp(original.y - dragRef.current.offsetY, 0, gridHeight - active.h);
     const candidate = { ...active, x: nextX, y: nextY };
     if (canPlaceItem(grid, items, candidate, active.id)) {
       onMoveItem(active.id, nextX, nextY);
     }
-  }, [grid, gridHeight, gridWidth, items, onMoveItem]);
+  }, [grid, gridHeight, gridWidth, items, onMoveItem, viewRotation]);
 
   const handlePointerUp = useCallback(() => {
     dragRef.current = null;
