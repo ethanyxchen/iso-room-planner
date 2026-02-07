@@ -1708,12 +1708,96 @@ const FURNITURE_CATALOG = {
 };
 const DEFAULT_WIDTH = 12;
 const DEFAULT_HEIGHT = 8;
+const ROOM_COLORS = {
+    bedroom: {
+        fill: 'rgba(86, 140, 214, 0.65)',
+        label: 'rgba(86, 140, 214, 0.9)'
+    },
+    living_room: {
+        fill: 'rgba(120, 201, 172, 0.6)',
+        label: 'rgba(120, 201, 172, 0.9)'
+    },
+    kitchen: {
+        fill: 'rgba(242, 192, 107, 0.7)',
+        label: 'rgba(242, 192, 107, 0.95)'
+    },
+    bathroom: {
+        fill: 'rgba(109, 178, 207, 0.65)',
+        label: 'rgba(109, 178, 207, 0.95)'
+    },
+    hallway: {
+        fill: 'rgba(195, 164, 122, 0.6)',
+        label: 'rgba(195, 164, 122, 0.9)'
+    },
+    office: {
+        fill: 'rgba(135, 206, 125, 0.6)',
+        label: 'rgba(135, 206, 125, 0.9)'
+    }
+};
+const MOCK_ROOMS = [
+    {
+        type: 'living_room',
+        label: 'Living Room',
+        x: 0,
+        y: 0,
+        w: 5,
+        h: 4
+    },
+    {
+        type: 'kitchen',
+        label: 'Kitchen',
+        x: 5,
+        y: 0,
+        w: 3,
+        h: 3
+    },
+    {
+        type: 'hallway',
+        label: 'Hallway',
+        x: 8,
+        y: 0,
+        w: 4,
+        h: 8
+    },
+    {
+        type: 'bedroom',
+        label: 'Bedroom',
+        x: 0,
+        y: 4,
+        w: 5,
+        h: 4
+    },
+    {
+        type: 'bathroom',
+        label: 'Bath',
+        x: 5,
+        y: 3,
+        w: 3,
+        h: 2
+    },
+    {
+        type: 'office',
+        label: 'Office',
+        x: 5,
+        y: 5,
+        w: 3,
+        h: 3
+    }
+];
 function createFloor(width, height) {
     return Array.from({
         length: height
     }, ()=>Array.from({
             length: width
         }, ()=>true));
+}
+function findRoomAt(rooms, x, y) {
+    for (const room of rooms){
+        if (x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h) {
+            return room;
+        }
+    }
+    return null;
 }
 function createId() {
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -1790,6 +1874,7 @@ function sanitizeItems(grid, items) {
 }
 function RoomPlanner() {
     _s();
+    const isoCanvasRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
     const [grid, setGrid] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])({
         "RoomPlanner.useState": ()=>createFloor(DEFAULT_WIDTH, DEFAULT_HEIGHT)
     }["RoomPlanner.useState"]);
@@ -1806,8 +1891,23 @@ function RoomPlanner() {
     const [rotation, setRotation] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(0);
     const [status, setStatus] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])('Drag furniture in the isometric view to move it.');
     const [selectedItemId, setSelectedItemId] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [rooms] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])({
+        "RoomPlanner.useState": ()=>MOCK_ROOMS
+    }["RoomPlanner.useState"]);
     const gridWidth = grid[0]?.length ?? 0;
     const gridHeight = grid.length;
+    const roomCount = rooms.length;
+    const handleDownload = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "RoomPlanner.useCallback[handleDownload]": ()=>{
+            const canvas = isoCanvasRef.current;
+            if (!canvas) return;
+            const url = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = 'iso-room.png';
+            link.href = url;
+            link.click();
+        }
+    }["RoomPlanner.useCallback[handleDownload]"], []);
     const occupancy = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "RoomPlanner.useMemo[occupancy]": ()=>{
             const map = new Map();
@@ -1886,349 +1986,432 @@ function RoomPlanner() {
         }
     }["RoomPlanner.useCallback[clearFurniture]"], []);
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
-        children: [
-            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("header", {
-                className: "header",
-                children: [
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
-                        children: "Iso Room Planner"
+        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
+            className: "planner",
+            children: [
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "canvas-layer",
+                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(IsoRoomCanvas, {
+                        grid: grid,
+                        items: items,
+                        rooms: rooms,
+                        onMoveItem: (id, nextX, nextY)=>{
+                            setItems((prev)=>prev.map((item)=>item.id === id ? {
+                                        ...item,
+                                        x: nextX,
+                                        y: nextY
+                                    } : item));
+                        },
+                        selectedItemId: selectedItemId,
+                        onSelectItem: setSelectedItemId,
+                        canvasRef: isoCanvasRef
                     }, void 0, false, {
                         fileName: "[project]/src/components/RoomPlanner.tsx",
-                        lineNumber: 245,
-                        columnNumber: 9
-                    }, this),
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                        children: "Sketch a floor plan, then watch it snap into a cozy isometric room. Drop furniture on the plan or drag it around in the 3D view."
-                    }, void 0, false, {
-                        fileName: "[project]/src/components/RoomPlanner.tsx",
-                        lineNumber: 246,
-                        columnNumber: 9
+                        lineNumber: 296,
+                        columnNumber: 11
                     }, this)
-                ]
-            }, void 0, true, {
-                fileName: "[project]/src/components/RoomPlanner.tsx",
-                lineNumber: 244,
-                columnNumber: 7
-            }, this),
-            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
-                className: "main",
-                children: [
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: "panel",
-                        children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                                children: "Floor Plan"
-                            }, void 0, false, {
-                                fileName: "[project]/src/components/RoomPlanner.tsx",
-                                lineNumber: 251,
-                                columnNumber: 11
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "tool-row",
-                                children: [
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                        className: `tool-button ${tool === 'floor' ? 'active' : ''}`,
-                                        onClick: ()=>setTool('floor'),
-                                        type: "button",
-                                        children: "Add Floor"
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/components/RoomPlanner.tsx",
-                                        lineNumber: 253,
-                                        columnNumber: 13
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                        className: `tool-button ${tool === 'erase' ? 'active' : ''}`,
-                                        onClick: ()=>setTool('erase'),
-                                        type: "button",
-                                        children: "Erase"
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/components/RoomPlanner.tsx",
-                                        lineNumber: 260,
-                                        columnNumber: 13
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                        className: `tool-button ${tool === 'furniture' ? 'active' : ''}`,
-                                        onClick: ()=>setTool('furniture'),
-                                        type: "button",
-                                        children: "Place Furniture"
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/components/RoomPlanner.tsx",
-                                        lineNumber: 267,
-                                        columnNumber: 13
-                                    }, this)
-                                ]
-                            }, void 0, true, {
-                                fileName: "[project]/src/components/RoomPlanner.tsx",
-                                lineNumber: 252,
-                                columnNumber: 11
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "furniture-list",
-                                children: Object.entries(FURNITURE_CATALOG).map(([key, data])=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                        type: "button",
-                                        className: `furniture-card ${activeFurniture === key ? 'active' : ''}`,
-                                        onClick: ()=>{
-                                            setActiveFurniture(key);
-                                            setTool('furniture');
-                                        },
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                className: "furniture-swatch",
-                                                style: {
-                                                    background: data.swatch
-                                                }
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/components/RoomPlanner.tsx",
-                                                lineNumber: 287,
-                                                columnNumber: 17
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
-                                                children: data.label
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/components/RoomPlanner.tsx",
-                                                lineNumber: 288,
-                                                columnNumber: 17
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                className: "note",
+                }, void 0, false, {
+                    fileName: "[project]/src/components/RoomPlanner.tsx",
+                    lineNumber: 295,
+                    columnNumber: 9
+                }, this),
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "hud",
+                    children: [
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "hud-top",
+                            children: [
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                    className: "hud-button",
+                                    type: "button",
+                                    children: "Pause"
+                                }, void 0, false, {
+                                    fileName: "[project]/src/components/RoomPlanner.tsx",
+                                    lineNumber: 317,
+                                    columnNumber: 13
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                    className: "hud-button secondary",
+                                    type: "button",
+                                    children: "Play"
+                                }, void 0, false, {
+                                    fileName: "[project]/src/components/RoomPlanner.tsx",
+                                    lineNumber: 318,
+                                    columnNumber: 13
+                                }, this)
+                            ]
+                        }, void 0, true, {
+                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                            lineNumber: 316,
+                            columnNumber: 11
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "hud-right",
+                            children: [
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: "hud-panel",
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
+                                            children: "Floor Plan"
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                            lineNumber: 323,
+                                            columnNumber: 15
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "tool-row",
+                                            children: [
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    className: `tool-button ${tool === 'floor' ? 'active' : ''}`,
+                                                    onClick: ()=>setTool('floor'),
+                                                    type: "button",
+                                                    children: "Add Floor"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                    lineNumber: 325,
+                                                    columnNumber: 17
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    className: `tool-button ${tool === 'erase' ? 'active' : ''}`,
+                                                    onClick: ()=>setTool('erase'),
+                                                    type: "button",
+                                                    children: "Erase"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                    lineNumber: 332,
+                                                    columnNumber: 17
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    className: `tool-button ${tool === 'furniture' ? 'active' : ''}`,
+                                                    onClick: ()=>setTool('furniture'),
+                                                    type: "button",
+                                                    children: "Place Furniture"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                    lineNumber: 339,
+                                                    columnNumber: 17
+                                                }, this)
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                            lineNumber: 324,
+                                            columnNumber: 15
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "furniture-list",
+                                            children: Object.entries(FURNITURE_CATALOG).map(([key, data])=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    type: "button",
+                                                    className: `furniture-card ${activeFurniture === key ? 'active' : ''}`,
+                                                    onClick: ()=>{
+                                                        setActiveFurniture(key);
+                                                        setTool('furniture');
+                                                    },
+                                                    children: [
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                            className: "furniture-swatch",
+                                                            style: {
+                                                                background: data.swatch
+                                                            }
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                            lineNumber: 359,
+                                                            columnNumber: 21
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                            children: data.label
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                            lineNumber: 360,
+                                                            columnNumber: 21
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                            className: "note",
+                                                            children: [
+                                                                data.w,
+                                                                "x",
+                                                                data.h,
+                                                                " tiles"
+                                                            ]
+                                                        }, void 0, true, {
+                                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                            lineNumber: 361,
+                                                            columnNumber: 21
+                                                        }, this)
+                                                    ]
+                                                }, key, true, {
+                                                    fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                    lineNumber: 350,
+                                                    columnNumber: 19
+                                                }, this))
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                            lineNumber: 348,
+                                            columnNumber: 15
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "tool-row",
+                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                className: "tool-button",
+                                                onClick: ()=>setRotation((prev)=>prev === 0 ? 90 : 0),
+                                                type: "button",
                                                 children: [
-                                                    data.w,
-                                                    "x",
-                                                    data.h,
-                                                    " tiles"
+                                                    "Rotate ",
+                                                    rotation === 0 ? '0°' : '90°'
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/RoomPlanner.tsx",
-                                                lineNumber: 289,
+                                                lineNumber: 367,
                                                 columnNumber: 17
                                             }, this)
-                                        ]
-                                    }, key, true, {
-                                        fileName: "[project]/src/components/RoomPlanner.tsx",
-                                        lineNumber: 278,
-                                        columnNumber: 15
-                                    }, this))
-                            }, void 0, false, {
-                                fileName: "[project]/src/components/RoomPlanner.tsx",
-                                lineNumber: 276,
-                                columnNumber: 11
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "tool-row",
-                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                    className: "tool-button",
-                                    onClick: ()=>setRotation((prev)=>prev === 0 ? 90 : 0),
-                                    type: "button",
-                                    children: [
-                                        "Rotate ",
-                                        rotation === 0 ? '0°' : '90°'
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                            lineNumber: 366,
+                                            columnNumber: 15
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "grid",
+                                            style: {
+                                                gridTemplateColumns: `repeat(${gridWidth}, 24px)`
+                                            },
+                                            children: grid.map((row, y)=>row.map((cell, x)=>{
+                                                    const key = `${x},${y}`;
+                                                    const itemType = occupancy.get(key);
+                                                    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                        type: "button",
+                                                        className: `grid-cell ${cell ? 'floor' : 'blocked'}`,
+                                                        onClick: ()=>handleCellClick(x, y),
+                                                        title: cell ? 'Floor' : 'Empty',
+                                                        style: itemType ? {
+                                                            background: FURNITURE_CATALOG[itemType].swatch,
+                                                            color: '#0b0f14'
+                                                        } : undefined,
+                                                        children: itemType ? itemType[0].toUpperCase() : ''
+                                                    }, key, false, {
+                                                        fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                        lineNumber: 385,
+                                                        columnNumber: 23
+                                                    }, this);
+                                                }))
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                            lineNumber: 376,
+                                            columnNumber: 15
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "legend",
+                                            children: [
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                    children: [
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("i", {
+                                                            style: {
+                                                                background: 'rgba(108, 212, 197, 0.6)'
+                                                            }
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                            lineNumber: 405,
+                                                            columnNumber: 23
+                                                        }, this),
+                                                        " Floor"
+                                                    ]
+                                                }, void 0, true, {
+                                                    fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                    lineNumber: 405,
+                                                    columnNumber: 17
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                    children: [
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("i", {
+                                                            style: {
+                                                                background: 'rgba(224, 122, 95, 0.5)'
+                                                            }
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                            lineNumber: 406,
+                                                            columnNumber: 23
+                                                        }, this),
+                                                        " Empty"
+                                                    ]
+                                                }, void 0, true, {
+                                                    fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                    lineNumber: 406,
+                                                    columnNumber: 17
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                    children: [
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("i", {
+                                                            style: {
+                                                                background: 'var(--accent)'
+                                                            }
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                            lineNumber: 407,
+                                                            columnNumber: 23
+                                                        }, this),
+                                                        " Furniture"
+                                                    ]
+                                                }, void 0, true, {
+                                                    fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                    lineNumber: 407,
+                                                    columnNumber: 17
+                                                }, this)
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                            lineNumber: 404,
+                                            columnNumber: 15
+                                        }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/RoomPlanner.tsx",
-                                    lineNumber: 295,
+                                    lineNumber: 322,
+                                    columnNumber: 13
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: "hud-panel",
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
+                                            children: "Actions"
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                            lineNumber: 412,
+                                            columnNumber: 15
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "actions",
+                                            children: [
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    className: "action-button primary",
+                                                    onClick: resetScene,
+                                                    type: "button",
+                                                    children: "Reset Scene"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                    lineNumber: 414,
+                                                    columnNumber: 17
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    className: "action-button",
+                                                    onClick: clearFurniture,
+                                                    type: "button",
+                                                    children: "Clear Furniture"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                    lineNumber: 415,
+                                                    columnNumber: 17
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    className: "action-button primary",
+                                                    onClick: handleDownload,
+                                                    type: "button",
+                                                    children: "Download PNG"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/components/RoomPlanner.tsx",
+                                                    lineNumber: 416,
+                                                    columnNumber: 17
+                                                }, this)
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                            lineNumber: 413,
+                                            columnNumber: 15
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "status",
+                                            children: [
+                                                status,
+                                                " Rooms: ",
+                                                roomCount
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                            lineNumber: 418,
+                                            columnNumber: 15
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                            className: "note",
+                                            children: "Tip: click any tile while in Place Furniture mode to drop items. Drag items around in the isometric view."
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                                            lineNumber: 419,
+                                            columnNumber: 15
+                                        }, this)
+                                    ]
+                                }, void 0, true, {
+                                    fileName: "[project]/src/components/RoomPlanner.tsx",
+                                    lineNumber: 411,
                                     columnNumber: 13
                                 }, this)
-                            }, void 0, false, {
-                                fileName: "[project]/src/components/RoomPlanner.tsx",
-                                lineNumber: 294,
-                                columnNumber: 11
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "grid",
-                                style: {
-                                    gridTemplateColumns: `repeat(${gridWidth}, 28px)`
-                                },
-                                children: grid.map((row, y)=>row.map((cell, x)=>{
-                                        const key = `${x},${y}`;
-                                        const itemType = occupancy.get(key);
-                                        return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                            type: "button",
-                                            className: `grid-cell ${cell ? 'floor' : 'blocked'}`,
-                                            onClick: ()=>handleCellClick(x, y),
-                                            title: cell ? 'Floor' : 'Empty',
-                                            style: itemType ? {
-                                                background: FURNITURE_CATALOG[itemType].swatch,
-                                                color: '#0b0f14'
-                                            } : undefined,
-                                            children: itemType ? itemType[0].toUpperCase() : ''
-                                        }, key, false, {
-                                            fileName: "[project]/src/components/RoomPlanner.tsx",
-                                            lineNumber: 313,
-                                            columnNumber: 19
-                                        }, this);
-                                    }))
-                            }, void 0, false, {
-                                fileName: "[project]/src/components/RoomPlanner.tsx",
-                                lineNumber: 304,
-                                columnNumber: 11
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "legend",
+                            ]
+                        }, void 0, true, {
+                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                            lineNumber: 321,
+                            columnNumber: 11
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "hud-bottom",
+                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "hud-bar",
                                 children: [
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("i", {
-                                                style: {
-                                                    background: 'rgba(108, 212, 197, 0.6)'
-                                                }
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/components/RoomPlanner.tsx",
-                                                lineNumber: 333,
-                                                columnNumber: 19
-                                            }, this),
-                                            " Floor"
-                                        ]
-                                    }, void 0, true, {
+                                        className: "hud-title",
+                                        children: "Iso Room Planner"
+                                    }, void 0, false, {
                                         fileName: "[project]/src/components/RoomPlanner.tsx",
-                                        lineNumber: 333,
-                                        columnNumber: 13
+                                        lineNumber: 425,
+                                        columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("i", {
-                                                style: {
-                                                    background: 'rgba(224, 122, 95, 0.5)'
-                                                }
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/components/RoomPlanner.tsx",
-                                                lineNumber: 334,
-                                                columnNumber: 19
-                                            }, this),
-                                            " Empty"
+                                            "Rooms: ",
+                                            roomCount
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/RoomPlanner.tsx",
-                                        lineNumber: 334,
-                                        columnNumber: 13
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("i", {
-                                                style: {
-                                                    background: 'var(--accent)'
-                                                }
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/components/RoomPlanner.tsx",
-                                                lineNumber: 335,
-                                                columnNumber: 19
-                                            }, this),
-                                            " Furniture"
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/src/components/RoomPlanner.tsx",
-                                        lineNumber: 335,
-                                        columnNumber: 13
+                                        lineNumber: 426,
+                                        columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/RoomPlanner.tsx",
-                                lineNumber: 332,
-                                columnNumber: 11
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "actions",
-                                children: [
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                        className: "action-button primary",
-                                        onClick: resetScene,
-                                        type: "button",
-                                        children: "Reset Scene"
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/components/RoomPlanner.tsx",
-                                        lineNumber: 339,
-                                        columnNumber: 13
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                        className: "action-button",
-                                        onClick: clearFurniture,
-                                        type: "button",
-                                        children: "Clear Furniture"
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/components/RoomPlanner.tsx",
-                                        lineNumber: 340,
-                                        columnNumber: 13
-                                    }, this)
-                                ]
-                            }, void 0, true, {
-                                fileName: "[project]/src/components/RoomPlanner.tsx",
-                                lineNumber: 338,
-                                columnNumber: 11
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                className: "note",
-                                children: "Tip: click any tile while in Place Furniture mode to drop items. Drag items around in the isometric view."
-                            }, void 0, false, {
-                                fileName: "[project]/src/components/RoomPlanner.tsx",
-                                lineNumber: 342,
-                                columnNumber: 11
+                                lineNumber: 424,
+                                columnNumber: 13
                             }, this)
-                        ]
-                    }, void 0, true, {
-                        fileName: "[project]/src/components/RoomPlanner.tsx",
-                        lineNumber: 250,
-                        columnNumber: 9
-                    }, this),
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: "panel",
-                        children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                                children: "Isometric Room"
-                            }, void 0, false, {
-                                fileName: "[project]/src/components/RoomPlanner.tsx",
-                                lineNumber: 346,
-                                columnNumber: 11
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(IsoRoomCanvas, {
-                                grid: grid,
-                                items: items,
-                                onMoveItem: (id, nextX, nextY)=>{
-                                    setItems((prev)=>prev.map((item)=>item.id === id ? {
-                                                ...item,
-                                                x: nextX,
-                                                y: nextY
-                                            } : item));
-                                },
-                                selectedItemId: selectedItemId,
-                                onSelectItem: setSelectedItemId
-                            }, void 0, false, {
-                                fileName: "[project]/src/components/RoomPlanner.tsx",
-                                lineNumber: 347,
-                                columnNumber: 11
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "status",
-                                children: status
-                            }, void 0, false, {
-                                fileName: "[project]/src/components/RoomPlanner.tsx",
-                                lineNumber: 362,
-                                columnNumber: 11
-                            }, this)
-                        ]
-                    }, void 0, true, {
-                        fileName: "[project]/src/components/RoomPlanner.tsx",
-                        lineNumber: 345,
-                        columnNumber: 9
-                    }, this)
-                ]
-            }, void 0, true, {
-                fileName: "[project]/src/components/RoomPlanner.tsx",
-                lineNumber: 249,
-                columnNumber: 7
-            }, this)
-        ]
-    }, void 0, true);
+                        }, void 0, false, {
+                            fileName: "[project]/src/components/RoomPlanner.tsx",
+                            lineNumber: 423,
+                            columnNumber: 11
+                        }, this)
+                    ]
+                }, void 0, true, {
+                    fileName: "[project]/src/components/RoomPlanner.tsx",
+                    lineNumber: 315,
+                    columnNumber: 9
+                }, this)
+            ]
+        }, void 0, true, {
+            fileName: "[project]/src/components/RoomPlanner.tsx",
+            lineNumber: 294,
+            columnNumber: 7
+        }, this)
+    }, void 0, false);
 }
-_s(RoomPlanner, "OsN5BUfCyCyrwbpTVefD/z5lo1A=");
+_s(RoomPlanner, "sttdeASukmXKdqRqBpOjuXwqLvg=");
 _c = RoomPlanner;
-function IsoRoomCanvas({ grid, items, onMoveItem, selectedItemId, onSelectItem }) {
+function IsoRoomCanvas({ grid, items, rooms, onMoveItem, selectedItemId, onSelectItem, canvasRef }) {
     _s1();
-    const canvasRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
+    const internalCanvasRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
+    const resolvedCanvasRef = canvasRef ?? internalCanvasRef;
     const containerRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
     const offsetRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])({
         x: 0,
         y: 0
     });
     const dragRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
+    const panRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
+    const [panOffset, setPanOffset] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])({
+        x: 0,
+        y: 0
+    });
     const [canvasSize, setCanvasSize] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])({
         width: 600,
         height: 520
@@ -2257,7 +2440,7 @@ function IsoRoomCanvas({ grid, items, onMoveItem, selectedItemId, onSelectItem }
     }["IsoRoomCanvas.useEffect"], []);
     const drawScene = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "IsoRoomCanvas.useCallback[drawScene]": ()=>{
-            const canvas = canvasRef.current;
+            const canvas = resolvedCanvasRef.current;
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
             if (!ctx) return;
@@ -2287,8 +2470,8 @@ function IsoRoomCanvas({ grid, items, onMoveItem, selectedItemId, onSelectItem }
             }["IsoRoomCanvas.useCallback[drawScene].maxY"]));
             const roomWidth = maxX - minX;
             const roomHeight = maxY - minY;
-            const offsetX = (canvasSize.width - roomWidth) / 2 - minX;
-            const offsetY = (canvasSize.height - roomHeight) / 2 - minY + 24;
+            const offsetX = (canvasSize.width - roomWidth) / 2 - minX + panOffset.x;
+            const offsetY = (canvasSize.height - roomHeight) / 2 - minY + 24 + panOffset.y;
             offsetRef.current = {
                 x: offsetX,
                 y: offsetY
@@ -2310,6 +2493,38 @@ function IsoRoomCanvas({ grid, items, onMoveItem, selectedItemId, onSelectItem }
                     }
                 }
             }["IsoRoomCanvas.useCallback[drawScene].drawDiamond"];
+            const drawLabelPill = {
+                "IsoRoomCanvas.useCallback[drawScene].drawLabelPill": (x, y, text, color)=>{
+                    ctx.save();
+                    ctx.font = '600 12px "Space Grotesk", system-ui';
+                    const paddingX = 10;
+                    const paddingY = 6;
+                    const metrics = ctx.measureText(text);
+                    const width = metrics.width + paddingX * 2;
+                    const height = 20 + paddingY;
+                    const radius = 10;
+                    const left = x - width / 2;
+                    const top = y - height / 2;
+                    ctx.beginPath();
+                    ctx.moveTo(left + radius, top);
+                    ctx.lineTo(left + width - radius, top);
+                    ctx.quadraticCurveTo(left + width, top, left + width, top + radius);
+                    ctx.lineTo(left + width, top + height - radius);
+                    ctx.quadraticCurveTo(left + width, top + height, left + width - radius, top + height);
+                    ctx.lineTo(left + radius, top + height);
+                    ctx.quadraticCurveTo(left, top + height, left, top + height - radius);
+                    ctx.lineTo(left, top + radius);
+                    ctx.quadraticCurveTo(left, top, left + radius, top);
+                    ctx.closePath();
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                    ctx.fillStyle = '#0b0f14';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(text, x, y + 1);
+                    ctx.restore();
+                }
+            }["IsoRoomCanvas.useCallback[drawScene].drawLabelPill"];
             const drawNorthWall = {
                 "IsoRoomCanvas.useCallback[drawScene].drawNorthWall": (x, y)=>{
                     const baseLeft = {
@@ -2357,8 +2572,10 @@ function IsoRoomCanvas({ grid, items, onMoveItem, selectedItemId, onSelectItem }
             for(let y = 0; y < gridHeight; y += 1){
                 for(let x = 0; x < gridWidth; x += 1){
                     if (!isFloorTile(grid, x, y)) continue;
+                    const room = findRoomAt(rooms, x, y);
                     const { screenX, screenY } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$packages$2f$isometric$2d$city$2f$src$2f$components$2f$game$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["gridToScreen"])(x, y, offsetX, offsetY);
-                    drawDiamond(screenX, screenY, 'rgba(55, 77, 95, 0.75)', 'rgba(36, 55, 70, 0.8)');
+                    const fill = room ? ROOM_COLORS[room.type].fill : 'rgba(55, 77, 95, 0.75)';
+                    drawDiamond(screenX, screenY, fill, 'rgba(36, 55, 70, 0.8)');
                 }
             }
             for(let y = 0; y < gridHeight; y += 1){
@@ -2372,6 +2589,14 @@ function IsoRoomCanvas({ grid, items, onMoveItem, selectedItemId, onSelectItem }
                         drawWestWall(screenX, screenY);
                     }
                 }
+            }
+            for (const room of rooms){
+                const centerX = room.x + room.w / 2;
+                const centerY = room.y + room.h / 2;
+                const { screenX, screenY } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$packages$2f$isometric$2d$city$2f$src$2f$components$2f$game$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["gridToScreen"])(centerX, centerY, offsetX, offsetY);
+                const labelX = screenX + __TURBOPACK__imported__module__$5b$project$5d2f$packages$2f$isometric$2d$city$2f$src$2f$components$2f$game$2f$types$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["TILE_WIDTH"] / 2;
+                const labelY = screenY + __TURBOPACK__imported__module__$5b$project$5d2f$packages$2f$isometric$2d$city$2f$src$2f$components$2f$game$2f$types$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["TILE_HEIGHT"] / 2 - 18;
+                drawLabelPill(labelX, labelY, room.label, ROOM_COLORS[room.type].label);
             }
             const sortedItems = [
                 ...items
@@ -2444,7 +2669,10 @@ function IsoRoomCanvas({ grid, items, onMoveItem, selectedItemId, onSelectItem }
         gridHeight,
         gridWidth,
         items,
-        selectedItemId
+        rooms,
+        selectedItemId,
+        resolvedCanvasRef,
+        panOffset
     ]);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "IsoRoomCanvas.useEffect": ()=>{
@@ -2455,7 +2683,7 @@ function IsoRoomCanvas({ grid, items, onMoveItem, selectedItemId, onSelectItem }
     ]);
     const handlePointerDown = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "IsoRoomCanvas.useCallback[handlePointerDown]": (event)=>{
-            const canvas = canvasRef.current;
+            const canvas = resolvedCanvasRef.current;
             if (!canvas) return;
             const rect = canvas.getBoundingClientRect();
             const x = event.clientX - rect.left;
@@ -2469,18 +2697,36 @@ function IsoRoomCanvas({ grid, items, onMoveItem, selectedItemId, onSelectItem }
                     offsetY: gridY - item.y
                 };
                 onSelectItem(item.id);
+                panRef.current = null;
             } else {
                 onSelectItem(null);
+                panRef.current = {
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    baseX: panOffset.x,
+                    baseY: panOffset.y
+                };
             }
         }
     }["IsoRoomCanvas.useCallback[handlePointerDown]"], [
         items,
-        onSelectItem
+        onSelectItem,
+        panOffset,
+        resolvedCanvasRef
     ]);
     const handlePointerMove = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "IsoRoomCanvas.useCallback[handlePointerMove]": (event)=>{
+            if (panRef.current) {
+                const dx = event.clientX - panRef.current.startX;
+                const dy = event.clientY - panRef.current.startY;
+                setPanOffset({
+                    x: panRef.current.baseX + dx,
+                    y: panRef.current.baseY + dy
+                });
+                return;
+            }
             if (!dragRef.current) return;
-            const canvas = canvasRef.current;
+            const canvas = resolvedCanvasRef.current;
             if (!canvas) return;
             const rect = canvas.getBoundingClientRect();
             const x = event.clientX - rect.left;
@@ -2506,34 +2752,36 @@ function IsoRoomCanvas({ grid, items, onMoveItem, selectedItemId, onSelectItem }
         gridHeight,
         gridWidth,
         items,
-        onMoveItem
+        onMoveItem,
+        resolvedCanvasRef
     ]);
     const handlePointerUp = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "IsoRoomCanvas.useCallback[handlePointerUp]": ()=>{
             dragRef.current = null;
+            panRef.current = null;
         }
     }["IsoRoomCanvas.useCallback[handlePointerUp]"], []);
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         className: "canvas-wrap",
         ref: containerRef,
         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("canvas", {
-            ref: canvasRef,
+            ref: resolvedCanvasRef,
             onPointerDown: handlePointerDown,
             onPointerMove: handlePointerMove,
             onPointerUp: handlePointerUp,
             onPointerLeave: handlePointerUp
         }, void 0, false, {
             fileName: "[project]/src/components/RoomPlanner.tsx",
-            lineNumber: 600,
+            lineNumber: 725,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/src/components/RoomPlanner.tsx",
-        lineNumber: 599,
+        lineNumber: 724,
         columnNumber: 5
     }, this);
 }
-_s1(IsoRoomCanvas, "QEsf+9CzFDajWRaIVxbQ3DZxWKw=");
+_s1(IsoRoomCanvas, "nBbUlqclV6IppGkhh4pH7Do/b14=");
 _c1 = IsoRoomCanvas;
 var _c, _c1;
 __turbopack_context__.k.register(_c, "RoomPlanner");
