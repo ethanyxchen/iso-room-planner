@@ -345,7 +345,7 @@ export default function RoomPlanner() {
     return (
         <>
             <header className="header">
-                <h1>Iso Room Planner</h1>
+                <h1>SnugBox</h1>
                 <p>
                     Sketch a floor plan, then watch it snap into a cozy isometric room. Drop
                     furniture on the plan or drag it around in the 3D view.

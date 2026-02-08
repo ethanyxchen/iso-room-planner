@@ -10,7 +10,7 @@ const pressStart2P = Press_Start_2P({
 });
 
 export const metadata: Metadata = {
-    title: "Iso Room Planner",
+    title: "SnugBox",
     description: "Turn floor plans into playful isometric rooms and move furniture around.",
 };
 
