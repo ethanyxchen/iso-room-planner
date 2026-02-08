@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import type { FloorPlanData, Room } from "@/types/floorplan";
 import type { FurnitureItem, FurnitureType, Rotation, ViewRotation } from "@/types/furniture";
 import {
@@ -278,6 +279,7 @@ export default function RoomPlanner() {
                     <h2>Floor Plan</h2>
 
                     <div
+                        tabIndex={0}
                         className={`upload-zone ${dragOver ? "dragover" : ""}`}
                         onDragOver={(e) => {
                             e.preventDefault();
@@ -290,6 +292,12 @@ export default function RoomPlanner() {
                             handleFiles(e.dataTransfer.files);
                         }}
                         onClick={() => fileInputRef.current?.click()}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                fileInputRef.current?.click();
+                            }
+                        }}
                     >
                         <input
                             ref={fileInputRef}
@@ -300,7 +308,13 @@ export default function RoomPlanner() {
                         />
                         {uploadPreview ? (
                             <div className="upload-preview">
-                                <img src={uploadPreview} alt="Floor plan preview" />
+                                <Image
+                                    src={uploadPreview}
+                                    alt="Floor plan preview"
+                                    width={400}
+                                    height={300}
+                                    unoptimized
+                                />
                                 <div className="upload-actions">
                                     <button
                                         type="button"
