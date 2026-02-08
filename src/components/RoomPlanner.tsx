@@ -425,10 +425,6 @@ function sanitizeItems(grid: boolean[][], items: FurnitureItem[]): FurnitureItem
     });
 }
 
-/* ------------------------------------------------------------------ */
-/* Auto-furnish: place appropriate furniture in detected rooms         */
-/* ------------------------------------------------------------------ */
-
 const ROOM_FURNITURE: Record<RoomType, FurnitureType[]> = {
     bedroom: ["bed", "nightstand", "lamp"],
     living_room: ["sofa", "table", "television", "plant"],
@@ -477,10 +473,6 @@ function autoFurnish(grid: boolean[][], rooms: Room[]): FurnitureItem[] {
 
     return placed;
 }
-
-/* ------------------------------------------------------------------ */
-/* Sample floor plan presets                                           */
-/* ------------------------------------------------------------------ */
 
 type SamplePreset = { name: string; data: FloorPlanData };
 
@@ -981,7 +973,6 @@ export default function RoomPlanner() {
     );
     const [baseRooms, setBaseRooms] = useState<Room[]>([]);
 
-    // Upload state
     const [uploadPreview, setUploadPreview] = useState<string | null>(null);
     const [uploading, setUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
@@ -994,7 +985,6 @@ export default function RoomPlanner() {
     const gridWidth = grid[0]?.length ?? 0;
     const gridHeight = grid.length;
 
-    // --- AI furnish helper ---
     const aiFurnish = useCallback(async (targetGrid: boolean[][], targetRooms: Room[]) => {
         if (targetRooms.length === 0) return;
         setFurnishing(true);
@@ -1030,7 +1020,6 @@ export default function RoomPlanner() {
         }
     }, []);
 
-    // --- Upload handlers ---
     const onFloorPlanParsed = useCallback(
         (data: FloorPlanData, furnish = true) => {
             setGrid(data.grid);
@@ -1707,7 +1696,6 @@ function IsoRoomCanvas({
             ctx.stroke();
         };
 
-        // Draw floor tiles (color-coded by room type)
         for (let y = 0; y < viewHeight; y += 1) {
             for (let x = 0; x < viewWidth; x += 1) {
                 const original = toOriginal(x, y, gridWidth, gridHeight, viewRotation);
@@ -1719,7 +1707,6 @@ function IsoRoomCanvas({
             }
         }
 
-        // Draw walls
         for (let y = 0; y < viewHeight; y += 1) {
             for (let x = 0; x < viewWidth; x += 1) {
                 const original = toOriginal(x, y, gridWidth, gridHeight, viewRotation);
@@ -1736,7 +1723,6 @@ function IsoRoomCanvas({
             }
         }
 
-        // Draw room labels
         if (rooms.length > 0) {
             for (const room of rooms) {
                 const centerX = room.x + room.w / 2;
