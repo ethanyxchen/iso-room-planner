@@ -1,32 +1,39 @@
-import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { Room } from '@/types/floorplan';
+import { NextResponse } from "next/server";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import type { Room } from "@/types/floorplan";
 
 const FURNITURE_TYPES = [
-  'sofa', 'bed', 'table', 'chair', 'plant',
-  'bookshelf', 'lamp', 'nightstand', 'stove', 'television',
+    "sofa",
+    "bed",
+    "table",
+    "chair",
+    "plant",
+    "bookshelf",
+    "lamp",
+    "nightstand",
+    "stove",
+    "television",
 ] as const;
 
 type FurnitureType = (typeof FURNITURE_TYPES)[number];
 
 /** Compact visual representation of the grid for the prompt */
 function gridToCompact(grid: boolean[][]): string {
-  return grid.map(row => row.map(cell => (cell ? '.' : '#')).join('')).join('\n');
+    return grid.map((row) => row.map((cell) => (cell ? "." : "#")).join("")).join("\n");
 }
 
 function buildFurnishPrompt(grid: boolean[][], rooms: Room[]): string {
-  const rows = grid.length;
-  const cols = grid[0]?.length ?? 0;
-  const compact = gridToCompact(grid);
+    const rows = grid.length;
+    const cols = grid[0]?.length ?? 0;
+    const compact = gridToCompact(grid);
 
-  const roomList = rooms
-    .map(
-      (r) =>
-        `  • ${r.label} (${r.type}): top-left col=${r.x} row=${r.y}, size ${r.w}×${r.h}`
-    )
-    .join('\n');
+    const roomList = rooms
+        .map(
+            (r) => `  • ${r.label} (${r.type}): top-left col=${r.x} row=${r.y}, size ${r.w}×${r.h}`,
+        )
+        .join("\n");
 
-  return `You are an expert interior designer. Given a floor plan, place furniture to create a beautiful, realistic, livable space.
+    return `You are an expert interior designer. Given a floor plan, place furniture to create a beautiful, realistic, livable space.
 
 FLOOR PLAN (${cols} cols × ${rows} rows — '.' = walkable floor, '#' = wall / outside):
 ${compact}
@@ -60,121 +67,112 @@ Return ONLY the JSON array. No markdown, no code fences, no explanation.`;
 type RawPlacement = { type: string; x: number; y: number };
 
 function validatePlacements(
-  raw: unknown,
-  grid: boolean[][]
+    raw: unknown,
+    grid: boolean[][],
 ): Array<{ type: FurnitureType; x: number; y: number }> {
-  if (!Array.isArray(raw)) return [];
+    if (!Array.isArray(raw)) return [];
 
-  const cols = grid[0]?.length ?? 0;
-  const rows = grid.length;
-  const validTypes = new Set<string>(FURNITURE_TYPES);
-  const occupied = new Set<string>();
-  const result: Array<{ type: FurnitureType; x: number; y: number }> = [];
+    const cols = grid[0]?.length ?? 0;
+    const rows = grid.length;
+    const validTypes = new Set<string>(FURNITURE_TYPES);
+    const occupied = new Set<string>();
+    const result: Array<{ type: FurnitureType; x: number; y: number }> = [];
 
-  for (const item of raw as RawPlacement[]) {
-    if (!item || typeof item !== 'object') continue;
-    const t = String(item.type);
-    const x = Number(item.x);
-    const y = Number(item.y);
+    for (const item of raw as RawPlacement[]) {
+        if (!item || typeof item !== "object") continue;
+        const t = String(item.type);
+        const x = Number(item.x);
+        const y = Number(item.y);
 
-    if (!validTypes.has(t)) continue;
-    if (!Number.isInteger(x) || !Number.isInteger(y)) continue;
-    if (x < 0 || y < 0 || x >= cols || y >= rows) continue;
-    if (!grid[y]?.[x]) continue; // not a floor tile
+        if (!validTypes.has(t)) continue;
+        if (!Number.isInteger(x) || !Number.isInteger(y)) continue;
+        if (x < 0 || y < 0 || x >= cols || y >= rows) continue;
+        if (!grid[y]?.[x]) continue; // not a floor tile
 
-    const key = `${x},${y}`;
-    if (occupied.has(key)) continue; // overlap
-    occupied.add(key);
+        const key = `${x},${y}`;
+        if (occupied.has(key)) continue; // overlap
+        occupied.add(key);
 
-    result.push({ type: t as FurnitureType, x, y });
-  }
+        result.push({ type: t as FurnitureType, x, y });
+    }
 
-  return result;
+    return result;
 }
 
 function extractJsonFromText(text: string): string {
-  const trimmed = text.trim();
-  const codeBlock = /```(?:json)?\s*([\s\S]*?)```/.exec(trimmed);
-  if (codeBlock) return codeBlock[1].trim();
-  return trimmed;
+    const trimmed = text.trim();
+    const codeBlock = /```(?:json)?\s*([\s\S]*?)```/.exec(trimmed);
+    if (codeBlock) return codeBlock[1].trim();
+    return trimmed;
 }
 
 export async function POST(request: Request) {
-  try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey === 'your-key-here') {
-      return NextResponse.json(
-        { error: 'GEMINI_API_KEY not configured' },
-        { status: 500 }
-      );
-    }
-
-    const body = await request.json();
-    const grid = body?.grid;
-    const rooms = body?.rooms;
-
-    if (!Array.isArray(grid) || !Array.isArray(rooms)) {
-      return NextResponse.json(
-        { error: 'Missing grid or rooms in request body' },
-        { status: 400 }
-      );
-    }
-
-    // Normalize grid to boolean[][]
-    const normalizedGrid: boolean[][] = grid.map((row: unknown) =>
-      Array.isArray(row) ? row.map((cell: unknown) => Boolean(cell)) : []
-    );
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      generationConfig: {
-        responseMimeType: 'application/json',
-      },
-    });
-
-    const prompt = buildFurnishPrompt(normalizedGrid, rooms as Room[]);
-
-    const result = await model.generateContent([{ text: prompt }]);
-    const response = result.response;
-    if (!response) {
-      return NextResponse.json(
-        { error: 'No response from model' },
-        { status: 502 }
-      );
-    }
-
-    const rawText = response.text();
-    if (!rawText) {
-      return NextResponse.json(
-        { error: 'Empty response from model' },
-        { status: 502 }
-      );
-    }
-
-    const jsonStr = extractJsonFromText(rawText);
-    let parsed: unknown;
     try {
-      parsed = JSON.parse(jsonStr);
-    } catch {
-      return NextResponse.json(
-        { error: 'Model did not return valid JSON', details: jsonStr.slice(0, 300) },
-        { status: 502 }
-      );
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey || apiKey === "your-key-here") {
+            return NextResponse.json({ error: "GEMINI_API_KEY not configured" }, { status: 500 });
+        }
+
+        const body = await request.json();
+        const grid = body?.grid;
+        const rooms = body?.rooms;
+
+        if (!Array.isArray(grid) || !Array.isArray(rooms)) {
+            return NextResponse.json(
+                { error: "Missing grid or rooms in request body" },
+                { status: 400 },
+            );
+        }
+
+        // Normalize grid to boolean[][]
+        const normalizedGrid: boolean[][] = grid.map((row: unknown) =>
+            Array.isArray(row) ? row.map((cell: unknown) => Boolean(cell)) : [],
+        );
+
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({
+            model: "gemini-2.5-flash",
+            generationConfig: {
+                responseMimeType: "application/json",
+            },
+        });
+
+        const prompt = buildFurnishPrompt(normalizedGrid, rooms as Room[]);
+
+        const result = await model.generateContent([{ text: prompt }]);
+        const response = result.response;
+        if (!response) {
+            return NextResponse.json({ error: "No response from model" }, { status: 502 });
+        }
+
+        const rawText = response.text();
+        if (!rawText) {
+            return NextResponse.json({ error: "Empty response from model" }, { status: 502 });
+        }
+
+        const jsonStr = extractJsonFromText(rawText);
+        let parsed: unknown;
+        try {
+            parsed = JSON.parse(jsonStr);
+        } catch {
+            return NextResponse.json(
+                { error: "Model did not return valid JSON", details: jsonStr.slice(0, 300) },
+                { status: 502 },
+            );
+        }
+
+        const placements = validatePlacements(parsed, normalizedGrid);
+
+        if (placements.length === 0) {
+            return NextResponse.json(
+                { error: "Model returned no valid furniture placements" },
+                { status: 502 },
+            );
+        }
+
+        return NextResponse.json({ furniture: placements });
+    } catch (err) {
+        const message = err instanceof Error ? err.message : "Furnishing failed";
+        return NextResponse.json({ error: message }, { status: 500 });
     }
-
-    const placements = validatePlacements(parsed, normalizedGrid);
-
-    if (placements.length === 0) {
-      return NextResponse.json(
-        { error: 'Model returned no valid furniture placements' },
-        { status: 502 }
-      );
-    }
-
-    return NextResponse.json({ furniture: placements });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Furnishing failed';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
 }

@@ -12,7 +12,8 @@ Iso Room Planner — a hackathon prototype that renders a 2D floor-plan grid alo
 yarn install       # install deps (also pulls local package)
 yarn dev           # start Next.js dev server (port 3000, Turbopack)
 yarn build         # production build (type-checks via tsc)
-yarn lint          # ESLint via eslint-config-next
+yarn lint          # oxlint
+yarn lint:fix      # oxlint with auto-fix
 ```
 
 No test framework is configured.
@@ -22,9 +23,9 @@ No test framework is configured.
 - **Next.js 16 + React 19** app using the App Router (`src/app/`).
 - Single page app — `page.tsx` renders `<RoomPlanner>`, the sole feature component.
 - `src/components/RoomPlanner.tsx` contains all room planner logic:
-  - **State**: floor grid (`boolean[][]`), furniture items, active tool, rotation.
-  - **Floor plan panel**: CSS-grid of clickable cells for paint/erase/furniture-place tools.
-  - **Isometric panel** (`IsoRoomCanvas`): HTML5 Canvas drawn each frame via `drawScene()`. Handles pointer drag to move furniture with collision checking.
+    - **State**: floor grid (`boolean[][]`), furniture items, active tool, rotation.
+    - **Floor plan panel**: CSS-grid of clickable cells for paint/erase/furniture-place tools.
+    - **Isometric panel** (`IsoRoomCanvas`): HTML5 Canvas drawn each frame via `drawScene()`. Handles pointer drag to move furniture with collision checking.
 - Styling is plain CSS in `src/app/globals.css` (CSS custom properties, no Tailwind in the main app). Fonts: Space Grotesk (UI) and Fraunces (display) via `next/font/google`.
 
 ### Local `isometric-city` package
@@ -32,6 +33,7 @@ No test framework is configured.
 `packages/isometric-city` is a **git submodule** (from `amilich/isometric-city`) linked as a local file dependency (`file:./packages/isometric-city`). It is transpiled via `next.config.js` (`transpilePackages`).
 
 The room planner imports only two things from it:
+
 - `gridToScreen` / `screenToGrid` — isometric coordinate conversion functions from `@isocity/components/game/utils`
 - `TILE_WIDTH` / `TILE_HEIGHT` — tile dimension constants from `@isocity/components/game/types`
 
