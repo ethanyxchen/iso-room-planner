@@ -18,6 +18,13 @@
     box-sizing: border-box;
 }
 
+button,
+input,
+select,
+textarea {
+    font-family: inherit;
+}
+
 html,
 body {
     padding: 0;
@@ -33,7 +40,7 @@ body {
         var(--bg-0) 100%
     );
     color: var(--ink);
-    font-family: var(--font-ui, system-ui);
+    font-family: var(--font-pixel, "Press Start 2P", monospace);
 }
 
 a {
@@ -52,8 +59,8 @@ a {
 }
 
 .header h1 {
-    font-family: var(--font-display, serif);
-    font-size: clamp(2rem, 4vw, 3.2rem);
+    font-family: var(--font-pixel, "Press Start 2P", monospace);
+    font-size: clamp(1.2rem, 2.5vw, 2rem);
     margin: 0;
     letter-spacing: 0.02em;
 }
@@ -88,7 +95,7 @@ a {
 }
 
 .panel h2 {
-    font-size: 1.1rem;
+    font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.12em;
     color: var(--muted);
@@ -108,7 +115,7 @@ a {
     color: var(--ink);
     padding: 8px 12px;
     border-radius: 999px;
-    font-size: 0.85rem;
+    font-size: 0.55rem;
     cursor: pointer;
     transition:
         transform 0.15s ease,
@@ -131,14 +138,14 @@ a {
     flex-direction: column;
     gap: 6px;
     margin-bottom: 14px;
-    font-size: 0.85rem;
+    font-size: 0.55rem;
     color: var(--muted);
 }
 
 .granularity-row > label {
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    font-size: 0.75rem;
+    font-size: 0.5rem;
 }
 
 .granularity-controls {
@@ -161,7 +168,7 @@ a {
 }
 
 .granularity-note {
-    font-size: 0.75rem;
+    font-size: 0.5rem;
     color: var(--accent-2);
 }
 
@@ -179,7 +186,7 @@ a {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.65rem;
+    font-size: 0.4rem;
     cursor: pointer;
     background: rgba(13, 18, 28, 0.8);
     color: var(--muted);
@@ -199,7 +206,7 @@ a {
     gap: 12px;
     flex-wrap: wrap;
     margin-top: 14px;
-    font-size: 0.8rem;
+    font-size: 0.5rem;
     color: var(--muted);
 }
 
@@ -230,6 +237,9 @@ a {
     padding: 10px;
     cursor: pointer;
     background: rgba(20, 28, 40, 0.7);
+    font-size: 0.45rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
     transition:
         border 0.15s ease,
         transform 0.15s ease;
@@ -273,7 +283,7 @@ a {
 
 .status {
     margin-top: 10px;
-    font-size: 0.85rem;
+    font-size: 0.55rem;
     color: var(--muted);
 }
 
@@ -314,7 +324,7 @@ a {
 }
 
 .note {
-    font-size: 0.8rem;
+    font-size: 0.5rem;
     color: var(--muted);
     margin-top: 12px;
     line-height: 1.5;
@@ -367,7 +377,7 @@ a {
 .upload-error {
     margin-top: 10px;
     color: var(--accent-3);
-    font-size: 0.85rem;
+    font-size: 0.55rem;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -382,7 +392,7 @@ a {
 }
 
 .preset-label {
-    font-size: 0.8rem;
+    font-size: 0.5rem;
     color: var(--muted);
     white-space: nowrap;
 }
