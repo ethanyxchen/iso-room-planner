@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -21,6 +22,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.1.1",
+    "oxlint": "^1.43.0",
     "typescript": "^5"
   },
   "packageManager": "yarn@4.12.0"

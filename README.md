@@ -37,8 +37,8 @@ GEMINI_API_KEY=your_key_here
 ### Install and Run
 
 ```bash
-npm install
-npm run dev
+yarn install
+yarn dev
 ```
 
 The app runs at [http://localhost:3000](http://localhost:3000).
@@ -46,8 +46,9 @@ The app runs at [http://localhost:3000](http://localhost:3000).
 ### Other Commands
 
 ```bash
-npm run build      # production build
-npm run lint       # run ESLint
+yarn build         # production build
+yarn lint          # run oxlint
+yarn lint:fix      # run oxlint with auto-fix
 ```
 
 ## Tech Stack
