@@ -1,29 +1,32 @@
 {
-  "name": "hackajohn-room-planner",
-  "private": true,
-  "version": "0.1.0",
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix"
-  },
-  "dependencies": {
-    "@google/generative-ai": "^0.24.1",
-    "isometric-city": "file:./packages/isometric-city",
-    "next": "^16.1.1",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1"
-  },
-  "devDependencies": {
-    "@types/node": "^22",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9.39.1",
-    "eslint-config-next": "^16.1.1",
-    "oxlint": "^1.43.0",
-    "typescript": "^5"
-  },
-  "packageManager": "yarn@4.12.0"
+    "name": "hackajohn-room-planner",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "oxlint",
+        "lint:fix": "oxlint --fix",
+        "format": "oxfmt",
+        "format:check": "oxfmt --check"
+    },
+    "dependencies": {
+        "@google/generative-ai": "^0.24.1",
+        "isometric-city": "file:./packages/isometric-city",
+        "next": "^16.1.1",
+        "react": "^19.2.1",
+        "react-dom": "^19.2.1"
+    },
+    "devDependencies": {
+        "@types/node": "^22",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "eslint": "^9.39.1",
+        "eslint-config-next": "^16.1.1",
+        "oxfmt": "^0.28.0",
+        "oxlint": "^1.43.0",
+        "typescript": "^5"
+    },
+    "packageManager": "yarn@4.12.0"
 }
